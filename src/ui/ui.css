@@ -114,6 +114,28 @@
   border-top: 2px solid var(--tinta-suave);
 }
 
+.bocadillo {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  padding-right: 1.6em;
+  min-height: 3.2em;
+}
+
+.bocadillo .flecha {
+  position: absolute;
+  right: 0.6em;
+  bottom: 0.35em;
+  font-size: 0.75em;
+  color: var(--acento);
+  animation: parpadeo 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes parpadeo {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0.3; transform: translateY(3px); }
+}
+
 .bocadillo .nombre {
   display: block;
   font-weight: 800;

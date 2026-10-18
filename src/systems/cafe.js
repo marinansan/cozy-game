@@ -38,10 +38,11 @@ export function serveResult(customer, ingredients, book) {
   const total = drinkScore + (bookOk ? 1 : 0); // de 0 a 3
 
   const yenes = [50, 70, 100, 130][total];
+  // Cada reacción es una lista de frases (páginas del bocadillo)
   const reacciones = [
-    'No era exactamente lo que buscaba… pero gracias por el detalle.',
-    'Mmm, no está mal. Gracias por escucharme.',
-    '¡Qué bien! Casi, casi lo que necesitaba.',
+    ['No era exactamente lo que buscaba…', 'Pero gracias por el detalle.'],
+    ['Mmm, no está mal.', 'Gracias por escucharme.'],
+    ['¡Qué bien!', 'Casi, casi lo que necesitaba.'],
     customer.gracias,
   ];
   return { total, yenes, reaccion: reacciones[total] };

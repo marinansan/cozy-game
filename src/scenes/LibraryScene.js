@@ -70,6 +70,8 @@ export default class LibraryScene extends Phaser.Scene {
 
     // PC: tecla E o espacio para atender
     const pressAction = () => {
+      if (this.ui.isPanelOpen()) return;
+      if (this.ui.advanceBubble()) return;
       if (this.ui.isActionVisible()) this.startServing();
     };
     this.input.keyboard.on('keydown-E', pressAction);
@@ -86,7 +88,7 @@ export default class LibraryScene extends Phaser.Scene {
     this.yen = 0;
     this.customerIndex = 0;
     this.customer = null;
-    this.customerState = 'none'; // none · walking · waiting · serving · leaving
+    this.customerState = 'none'; // none · walking · talking · waiting · serving · leaving
     this.time.delayedCall(1200, () => this.spawnCustomer());
   }
 
@@ -105,8 +107,11 @@ export default class LibraryScene extends Phaser.Scene {
     this.customerState = 'walking';
     const path = this.pathfinder.findPath(DOOR.x, DOOR.y, CUSTOMER_SPOT.x, CUSTOMER_SPOT.y);
     this.customer.walk(path, () => {
-      this.customerState = 'waiting';
-      this.ui.showBubble(this.customer.x, this.customer.y + BUBBLE_OFFSET, data.nombre, data.pedido);
+      // Cuenta lo que necesita; cuando termina de hablar, ya se le puede atender
+      this.customerState = 'talking';
+      this.ui.showBubble(this.customer.x, this.customer.y + BUBBLE_OFFSET, data.nombre, data.pedido, () => {
+        this.customerState = 'waiting';
+      });
     });
   }
 
@@ -124,8 +129,10 @@ export default class LibraryScene extends Phaser.Scene {
       this.yen += result.yenes;
       this.ui.setYen(this.yen, true);
       this.ui.floatText(customer.x, customer.y - FLOAT_OFFSET, `+${result.yenes} ¥`);
-      this.ui.showBubble(customer.x, customer.y + BUBBLE_OFFSET, customer.data.nombre, result.reaccion);
-      this.time.delayedCall(3500, () => this.customerLeaves());
+      // Se despide cuando has leído toda su reacción (y un momento después)
+      this.ui.showBubble(customer.x, customer.y + BUBBLE_OFFSET, customer.data.nombre, result.reaccion, () => {
+        this.time.delayedCall(2500, () => this.customerLeaves());
+      });
     });
   }
 

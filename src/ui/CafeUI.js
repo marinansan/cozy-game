@@ -6,6 +6,7 @@ const GAME_WIDTH = 640;
 const GAME_HEIGHT = 360;
 const MAX_INGREDIENTS = 3;
 const MIN_INGREDIENTS = 2;
+const TYPE_SPEED = 28; // milisegundos por letra
 
 // Interfaz HTML de la cafetería: yenes, pistas, botón de acción,
 // bocadillos de diálogo y el panel para preparar la bebida y elegir el libro.
@@ -63,16 +64,72 @@ export default class CafeUI {
     return !this.action.hidden;
   }
 
-  showBubble(x, y, name, text) {
+  // Bocadillo de diálogo por páginas: el texto se escribe letra a letra
+  // y se pasa a la siguiente frase tocando el bocadillo (o con E / espacio).
+  // onFinished se llama cuando se ha mostrado la última página.
+  showBubble(x, y, name, pages, onFinished) {
     this.hideBubble();
-    this.bubble = this.add('div', 'bocadillo');
+    this.bubble = this.add('div', 'bocadillo interactivo');
     const nameEl = this.add('span', 'nombre', this.bubble);
     nameEl.textContent = name;
-    this.bubble.append(text);
+    const textEl = this.add('span', 'texto', this.bubble);
+    const arrow = this.add('span', 'flecha', this.bubble);
+    arrow.textContent = '▼';
     this.place(this.bubble, x, y);
+
+    this.dialogue = { pages, page: 0, textEl, arrow, timer: null, typing: false, onFinished };
+    this.bubble.onclick = () => this.advanceBubble();
+    this.typePage();
+  }
+
+  typePage() {
+    const d = this.dialogue;
+    const text = d.pages[d.page];
+    let shown = 0;
+    d.typing = true;
+    d.arrow.hidden = true;
+    d.textEl.textContent = '';
+    clearInterval(d.timer);
+    d.timer = setInterval(() => {
+      shown++;
+      d.textEl.textContent = text.slice(0, shown);
+      if (shown >= text.length) this.finishTyping();
+    }, TYPE_SPEED);
+  }
+
+  finishTyping() {
+    const d = this.dialogue;
+    clearInterval(d.timer);
+    d.typing = false;
+    d.textEl.textContent = d.pages[d.page];
+    const isLast = d.page === d.pages.length - 1;
+    d.arrow.hidden = isLast;
+    if (isLast && d.onFinished) {
+      const done = d.onFinished;
+      d.onFinished = null;
+      done();
+    }
+  }
+
+  // Devuelve true si el bocadillo ha usado la pulsación
+  advanceBubble() {
+    const d = this.dialogue;
+    if (!this.bubble || !d) return false;
+    if (d.typing) {
+      this.finishTyping();
+      return true;
+    }
+    if (d.page < d.pages.length - 1) {
+      d.page++;
+      this.typePage();
+      return true;
+    }
+    return false;
   }
 
   hideBubble() {
+    if (this.dialogue) clearInterval(this.dialogue.timer);
+    this.dialogue = null;
     this.bubble?.remove();
     this.bubble = null;
   }
@@ -108,7 +165,7 @@ export default class CafeUI {
     const h = this.add('h2', '', card);
     h.textContent = title;
     const quote = this.add('p', 'pedido', card);
-    quote.textContent = `${customer.nombre}: «${customer.pedido}»`;
+    quote.textContent = `${customer.nombre}: «${customer.pedido.join(' ')}»`;
   }
 
   showDrinkStep(card, customer, next) {
