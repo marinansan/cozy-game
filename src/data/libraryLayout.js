@@ -6,6 +6,16 @@ export const LIBRARY_BACKGROUND = 'libreria';
 
 export const PLAYER_START = { x: 260, y: 300 };
 
+// Puerta de entrada (los clientes aparecen y se van por aquí)
+export const DOOR = { x: 260, y: 342 };
+
+// Zona detrás del mostrador: desde aquí se puede atender.
+// Se entra por el hueco del extremo derecho de la barra.
+export const BARISTA_ZONE = { x: 362, y: 80, w: 201, h: 26 };
+
+// Sitio donde espera el cliente, delante del mostrador
+export const CUSTOMER_SPOT = { x: 405, y: 174 };
+
 export const LIBRARY_OBSTACLES = [
   // Paredes
   { x: 0, y: 0, w: 62, h: 360, nombre: 'pared izquierda' },
@@ -17,9 +27,9 @@ export const LIBRARY_OBSTACLES = [
   // Fondo de la sala
   { x: 62, y: 0, w: 76, h: 130, nombre: 'banco de la ventana' },
   { x: 138, y: 0, w: 224, h: 118, nombre: 'estanterías del fondo' },
-  { x: 362, y: 0, w: 180, h: 160, nombre: 'mostrador de la cafetería' },
+  { x: 362, y: 0, w: 201, h: 86, nombre: 'muebles detrás del mostrador' },
+  { x: 362, y: 100, w: 175, h: 65, nombre: 'mostrador de la cafetería' },
   { x: 440, y: 140, w: 55, h: 35, nombre: 'taburetes' },
-  { x: 537, y: 0, w: 26, h: 125, nombre: 'rincón del café' },
 
   // Muebles
   { x: 78, y: 128, w: 85, h: 50, nombre: 'mesa redonda izquierda' },

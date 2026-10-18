@@ -28,7 +28,7 @@ Comprobar que el corazón del juego funciona y resulta relajante: **un día comp
 - El personaje camina al tocar o hacer clic en el suelo, y con el teclado en PC. Choca con los muebles.
 - ✅ *Se ve:* un cuadrado que pasea por la librería.
 
-### Paso 2. Atender a un cliente
+### Paso 2. Atender a un cliente ✔️ (hecho)
 - Llega un cliente y dice una frase en una burbuja.
 - Menú de bebida: elegir 2 o 3 ingredientes entre unos pocos (té verde, café, leche, miel).
 - Menú de libro: elegir entre 3 libros con etiquetas.

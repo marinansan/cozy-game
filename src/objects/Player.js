@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { createFigure } from './figure.js';
 
 const SPEED = 80; // píxeles por segundo
 
@@ -14,17 +15,25 @@ export default class Player {
     scene.physics.add.existing(this.body);
     this.body.body.setCollideWorldBounds(true);
 
-    // Dibujo provisional: sombra, cuerpo y cabeza
-    this.sprite = scene.add.container(x, y, [
-      scene.add.ellipse(0, 0, 12, 5, 0x000000, 0.25),
-      scene.add.rectangle(0, -7, 10, 12, 0x6b8f71).setStrokeStyle(1, 0x3d5443),
-      scene.add.circle(0, -16, 5, 0xf2d3b3).setStrokeStyle(1, 0x8a6a55),
-      scene.add.rectangle(0, -20, 11, 4, 0x5b3a29),
-    ]);
+    // Dibujo provisional
+    this.sprite = createFigure(scene, x, y, { cuerpo: 0x6b8f71, pelo: 0x5b3a29 });
   }
 
   walkTo(points) {
     this.path = points ?? [];
+  }
+
+  get x() {
+    return this.body.x;
+  }
+
+  get y() {
+    return this.body.y;
+  }
+
+  stop() {
+    this.path = [];
+    this.body.body.setVelocity(0, 0);
   }
 
   update(keys, joystick) {
@@ -57,5 +66,6 @@ export default class Player {
     }
 
     this.sprite.setPosition(Math.round(this.body.x), Math.round(this.body.y));
+    this.sprite.setDepth(this.body.y); // quien está más abajo se dibuja delante
   }
 }
