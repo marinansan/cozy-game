@@ -4,7 +4,7 @@
 
 export const LIBRARY_BACKGROUND = 'libreria';
 
-export const PLAYER_START = { x: 260, y: 300 };
+export const PLAYER_START = { x: 320, y: 270 };
 
 // Puerta de entrada (los clientes aparecen y se van por aquí)
 export const DOOR = { x: 260, y: 342 };
@@ -12,6 +12,20 @@ export const DOOR = { x: 260, y: 342 };
 // Zona detrás del mostrador: desde aquí se puede atender.
 // Se entra por el hueco del extremo derecho de la barra.
 export const BARISTA_ZONE = { x: 362, y: 80, w: 201, h: 26 };
+
+// Puntos donde se puede interactuar (el botón aparece al acercarse)
+export const SIGN_SPOT = { x: 260, y: 312, radio: 28 }; // cartel de abierto / cerrado, junto a la puerta
+export const STAIRS_SPOT = { x: 352, y: 124, radio: 20 }; // cortina del fondo: sube a casa a dormir
+
+// Lámparas que se encienden de noche { x, y, radio }
+export const LAMPS = [
+  { x: 102, y: 58, radio: 45 }, // lámpara de la ventana
+  { x: 465, y: 50, radio: 50 }, // lámpara del mostrador
+  { x: 283, y: 86, radio: 22 }, // farolillo de las estanterías
+  { x: 328, y: 80, radio: 22 }, // farolillo junto al cuadro
+  { x: 44, y: 232, radio: 26 }, // farolillo de la pared izquierda
+  { x: 605, y: 275, radio: 26 }, // farolillo de la pared derecha
+];
 
 // Sitio donde espera el cliente, delante del mostrador
 export const CUSTOMER_SPOT = { x: 405, y: 174 };

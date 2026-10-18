@@ -16,6 +16,7 @@ export default class CafeUI {
     this.root.innerHTML = '';
 
     this.hud = this.add('div', 'hud');
+    this.status = this.add('div', 'hud estado');
     this.hint = this.add('div', 'pista');
     this.action = this.add('button', 'accion interactivo');
     this.hint.hidden = true;
@@ -45,6 +46,17 @@ export default class CafeUI {
       void this.hud.offsetWidth; // reinicia la animación
       this.hud.classList.add('salto');
     }
+  }
+
+  setStatus(day, phase) {
+    this.status.textContent = `Día ${day} · ${phase.icono} ${phase.nombre}`;
+  }
+
+  // Cartel grande en el centro al cambiar de fase ("Día 2 · Mañana")
+  showTitle(text) {
+    const el = this.add('div', 'titulo');
+    el.textContent = text;
+    setTimeout(() => el.remove(), 2200);
   }
 
   showHint(text) {

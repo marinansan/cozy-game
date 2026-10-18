@@ -54,6 +54,32 @@
   50% { transform: scale(1.2); }
 }
 
+/* Día y fase, arriba a la derecha */
+.hud.estado {
+  left: auto;
+  right: 2%;
+}
+
+/* Título grande al cambiar de fase */
+.titulo {
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--papel);
+  font-size: 2.2em;
+  font-weight: 800;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  animation: titulo 2.2s ease forwards;
+}
+
+@keyframes titulo {
+  0% { opacity: 0; }
+  20%, 70% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* Pista en la parte inferior */
 .pista {
   position: absolute;

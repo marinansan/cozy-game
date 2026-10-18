@@ -35,7 +35,7 @@ Comprobar que el corazón del juego funciona y resulta relajante: **un día comp
 - El cliente reacciona y te da yenes. Se muestra un contador de yenes.
 - ✅ *Se ve:* un ciclo completo de servicio.
 
-### Paso 3. Las fases del día
+### Paso 3. Las fases del día ✔️ (hecho)
 - Mañana (2 o 3 clientes) → cartel de "cerrado" → tarde → abrir de noche → dormir → nuevo día.
 - Cambio de color de la pantalla en cada fase (cálido, dorado y azul noche).
 - ✅ *Se ve:* un día completo que avanza cuando tú decides.
