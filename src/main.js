@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import LibraryScene from './scenes/LibraryScene.js';
+import TownScene from './scenes/TownScene.js';
 
 // Resolución base del juego (16:9, horizontal). Phaser la escala para
 // que encaje en cualquier pantalla, de PC o de móvil.
@@ -18,7 +19,7 @@ const config = {
     default: 'arcade',
     arcade: { debug: false },
   },
-  scene: [LibraryScene],
+  scene: [LibraryScene, TownScene],
 };
 
 const game = new Phaser.Game(config);

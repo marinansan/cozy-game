@@ -40,7 +40,7 @@ Comprobar que el corazón del juego funciona y resulta relajante: **un día comp
 - Cambio de color de la pantalla en cada fase (cálido, dorado y azul noche).
 - ✅ *Se ve:* un día completo que avanza cuando tú decides.
 
-### Paso 4. El barrio por la tarde
+### Paso 4. El barrio por la tarde ✔️ (hecho, con bloques provisionales)
 - Salir por la puerta a una calle pequeña con una zona cubierta de niebla.
 - Un objeto-pista escondido en la calle que se puede recoger.
 - ✅ *Se ve:* exploración y recogida de un objeto.

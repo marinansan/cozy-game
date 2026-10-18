@@ -13,8 +13,9 @@ export default class VirtualJoystick {
 
     this.base = scene.add.circle(0, 0, RADIUS, 0xf4e9d8, 0.18).setStrokeStyle(1, 0xf4e9d8, 0.5);
     this.knob = scene.add.circle(0, 0, 9, 0xf4e9d8, 0.55);
-    this.base.setDepth(100).setVisible(false);
-    this.knob.setDepth(101).setVisible(false);
+    // Fijos en la pantalla aunque la cámara se mueva por el mapa
+    this.base.setDepth(2000).setScrollFactor(0).setVisible(false);
+    this.knob.setDepth(2001).setScrollFactor(0).setVisible(false);
 
     scene.input.on('pointerdown', (pointer) => {
       if (!pointer.wasTouch || this.pointerId !== null) return;

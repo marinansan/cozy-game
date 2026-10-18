@@ -73,14 +73,17 @@ export default class Pathfinder {
 
     const key = (c) => c.row * this.cols + c.col;
     const heuristic = (c) => Math.hypot(c.col - goal.col, c.row - goal.row);
-    const open = [start];
+    const open = new MinHeap();
     const cameFrom = new Map();
     const cost = new Map([[key(start), 0]]);
-    const score = new Map([[key(start), heuristic(start)]]);
+    const closed = new Set();
+    open.push(start, heuristic(start));
 
-    while (open.length) {
-      open.sort((a, b) => score.get(key(a)) - score.get(key(b)));
-      const current = open.shift();
+    while (open.size) {
+      const current = open.pop();
+      const currentKey = key(current);
+      if (closed.has(currentKey)) continue;
+      closed.add(currentKey);
 
       if (current.col === goal.col && current.row === goal.row) {
         const cells = [current];
@@ -94,12 +97,11 @@ export default class Pathfinder {
         // Evita "cortar esquinas" en diagonal pegado a un mueble
         if (dc && dr && (!this.isWalkable(current.col + dc, current.row) || !this.isWalkable(current.col, current.row + dr))) continue;
 
-        const newCost = cost.get(key(current)) + Math.hypot(dc, dr);
+        const newCost = cost.get(currentKey) + Math.hypot(dc, dr);
         if (newCost < (cost.get(key(next)) ?? Infinity)) {
           cameFrom.set(key(next), current);
           cost.set(key(next), newCost);
-          score.set(key(next), newCost + heuristic(next));
-          if (!open.some((c) => c.col === next.col && c.row === next.row)) open.push(next);
+          open.push(next, newCost + heuristic(next));
         }
       }
     }
@@ -120,5 +122,50 @@ export default class Pathfinder {
     }
     result.push(cells[cells.length - 1]);
     return result;
+  }
+}
+
+// Lista ordenada por prioridad (la casilla más prometedora sale primero).
+// Hace que buscar caminos largos en mapas grandes sea rápido.
+class MinHeap {
+  constructor() {
+    this.items = [];
+  }
+
+  get size() {
+    return this.items.length;
+  }
+
+  push(value, priority) {
+    const items = this.items;
+    items.push({ value, priority });
+    let i = items.length - 1;
+    while (i > 0) {
+      const parent = (i - 1) >> 1;
+      if (items[parent].priority <= items[i].priority) break;
+      [items[parent], items[i]] = [items[i], items[parent]];
+      i = parent;
+    }
+  }
+
+  pop() {
+    const items = this.items;
+    const top = items[0];
+    const last = items.pop();
+    if (items.length) {
+      items[0] = last;
+      let i = 0;
+      for (;;) {
+        const left = i * 2 + 1;
+        const right = left + 1;
+        let smallest = i;
+        if (left < items.length && items[left].priority < items[smallest].priority) smallest = left;
+        if (right < items.length && items[right].priority < items[smallest].priority) smallest = right;
+        if (smallest === i) break;
+        [items[smallest], items[i]] = [items[i], items[smallest]];
+        i = smallest;
+      }
+    }
+    return top.value;
   }
 }

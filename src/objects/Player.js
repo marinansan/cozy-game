@@ -31,6 +31,11 @@ export default class Player {
     return this.body.y;
   }
 
+  // ¿Se está moviendo ahora mismo?
+  isMoving() {
+    return this.body.body.velocity.lengthSq() > 1 || this.path.length > 0;
+  }
+
   stop() {
     this.path = [];
     this.body.body.setVelocity(0, 0);

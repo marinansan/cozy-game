@@ -19,8 +19,10 @@ export default class CafeUI {
     this.status = this.add('div', 'hud estado');
     this.hint = this.add('div', 'pista');
     this.action = this.add('button', 'accion interactivo');
+    this.mapButton = this.add('button', 'boton-mapa interactivo');
     this.hint.hidden = true;
     this.action.hidden = true;
+    this.mapButton.hidden = true;
     this.bubble = null;
     this.panel = null;
     this.setYen(0);
@@ -69,6 +71,15 @@ export default class CafeUI {
     if (label) {
       this.action.textContent = label;
       this.action.onclick = onClick;
+    }
+  }
+
+  // Botón para ver el barrio de lejos (solo en el barrio)
+  showMapButton(label, onClick) {
+    this.mapButton.hidden = !label;
+    if (label) {
+      this.mapButton.textContent = label;
+      this.mapButton.onclick = onClick;
     }
   }
 

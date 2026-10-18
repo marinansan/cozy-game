@@ -9,6 +9,7 @@ import {
   STAIRS_SPOT,
 } from '../data/libraryLayout.js';
 import { PHASES } from '../data/phases.js';
+import { state } from '../systems/GameState.js';
 import { serveResult } from '../systems/cafe.js';
 import Pathfinder from '../systems/Pathfinder.js';
 import CustomerManager from '../systems/CustomerManager.js';
@@ -29,6 +30,12 @@ export default class LibraryScene extends Phaser.Scene {
     super('LibraryScene');
   }
 
+  // data.fromTown: vuelve del barrio (aparece en la puerta, en la misma fase)
+  // data.phase: fase con la que empieza (por defecto, la guardada en el estado)
+  init(data) {
+    this.entry = data ?? {};
+  }
+
   preload() {
     this.load.image(LIBRARY_BACKGROUND, 'assets/libreria.png');
   }
@@ -39,7 +46,8 @@ export default class LibraryScene extends Phaser.Scene {
 
     this.createObstacles();
 
-    this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
+    const start = this.entry.fromTown ? { x: SIGN_SPOT.x, y: SIGN_SPOT.y - 8 } : PLAYER_START;
+    this.player = new Player(this, start.x, start.y);
     this.physics.add.collider(this.player.body, this.obstacles);
 
     this.pathfinder = new Pathfinder({
@@ -55,14 +63,15 @@ export default class LibraryScene extends Phaser.Scene {
 
     this.ui = new CafeUI(document.getElementById('ui'));
     this.customers = new CustomerManager(this, this.pathfinder);
-    this.yen = 0;
-    this.day = 1;
-    this.neighborhoodStage = 0; // crecerá al recuperar recuerdos (pasos 5 y 6)
+    this.ui.setYen(state.yen);
     this.currentAction = null;
     this.transitioning = false;
     this.askedAt = null; // punto donde ya se ha hecho la pregunta (para no repetirla)
 
-    this.startPhase('manana');
+    this.startPhase(this.entry.phase ?? state.phase, { quiet: this.entry.fromTown });
+    // Al volver del barrio estás en la puerta: no preguntar hasta que te alejes
+    if (this.entry.fromTown) this.askedAt = SIGN_SPOT;
+    if (this.entry.phase) this.cameras.main.fadeIn(FADE_TIME, 20, 14, 10);
   }
 
   // Muebles y paredes: rectángulos invisibles que bloquean el paso
@@ -99,14 +108,17 @@ export default class LibraryScene extends Phaser.Scene {
       .setAlpha(0);
 
     // Textura de brillo suave, de centro claro a bordes transparentes (el color lo pone cada fase)
-    const glow = this.textures.createCanvas('glow', 64, 64);
-    const ctx = glow.getContext();
-    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, 64, 64);
-    glow.refresh();
+    // (solo se crea la primera vez: la escena se vuelve a crear al volver del barrio)
+    if (!this.textures.exists('glow')) {
+      const glow = this.textures.createCanvas('glow', 64, 64);
+      const ctx = glow.getContext();
+      const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+      gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 64, 64);
+      glow.refresh();
+    }
 
     this.lamps = LAMPS.map((lamp) =>
       this.add
@@ -160,12 +172,16 @@ export default class LibraryScene extends Phaser.Scene {
 
   // ---------- Fases del día ----------
 
-  startPhase(phaseId) {
+  // options.quiet: sin el título grande (p. ej. al volver del barrio en la misma fase)
+  startPhase(phaseId, options = {}) {
     const phase = PHASES[phaseId];
     this.phase = phaseId;
+    state.phase = phaseId;
     this.askedAt = null;
-    this.ui.setStatus(this.day, phase);
-    this.ui.showTitle(phaseId === 'manana' ? `Día ${this.day} · ${phase.icono} ${phase.nombre}` : `${phase.icono} ${phase.nombre}`);
+    this.ui.setStatus(state.day, phase);
+    if (!options.quiet) {
+      this.ui.showTitle(phaseId === 'manana' ? `Día ${state.day} · ${phase.icono} ${phase.nombre}` : `${phase.icono} ${phase.nombre}`);
+    }
 
     // Mezcla el tinte con blanco según la fuerza de la fase
     const color = Phaser.Display.Color.Interpolate.ColorWithColor(
@@ -181,7 +197,7 @@ export default class LibraryScene extends Phaser.Scene {
       if (phase.luces) lamp.setTint(phase.luces);
     }
 
-    if (phaseId === 'manana') this.customers.startDay(this.neighborhoodStage);
+    if (phaseId === 'manana') this.customers.startDay(state.neighborhoodStage);
   }
 
   // Fundido a negro, cambio de fase y vuelta a la luz
@@ -203,7 +219,7 @@ export default class LibraryScene extends Phaser.Scene {
     });
   }
 
-  // Al llegar a la puerta o a la cortina, un bocadillo pregunta si quieres pasar de fase.
+  // Al pararte en la puerta o en la cortina, un bocadillo pregunta si quieres pasar de fase.
   // Si dices que no, no vuelve a preguntar hasta que te alejes y vuelvas.
   updateQuestions() {
     const spot = this.phase === 'noche' ? STAIRS_SPOT : SIGN_SPOT;
@@ -212,10 +228,12 @@ export default class LibraryScene extends Phaser.Scene {
       if (this.askedAt === spot) this.askedAt = null;
       return;
     }
-    if (this.askedAt === spot || this.ui.isBubbleOpen()) return;
+    // Solo pregunta cuando te paras allí (no al pasar por delante)
+    if (this.askedAt === spot || this.ui.isBubbleOpen() || this.player.isMoving()) return;
 
     let question;
     let onYes;
+    let options = null; // si hay más de dos respuestas
     if (this.phase === 'manana') {
       if (!this.customers.canClose()) return; // no se cierra mientras alguien espera a que le atiendas
       question = this.customers.moreToday()
@@ -226,13 +244,17 @@ export default class LibraryScene extends Phaser.Scene {
         this.goToPhase('tarde', () => this.customers.clearAll());
       };
     } else if (this.phase === 'tarde') {
-      question = '¿Abrir la librería esta noche?';
-      onYes = () => this.goToPhase('noche');
+      question = 'Es por la tarde. ¿Qué quieres hacer?';
+      options = [
+        { label: '🌳 Salir al barrio', principal: true, onClick: () => this.goToTown() },
+        { label: '🌙 Abrir de noche', principal: true, onClick: () => this.goToPhase('noche') },
+        { label: 'Nada', onClick: () => {} },
+      ];
     } else {
       question = '¿Subir a casa a dormir?';
       onYes = () =>
         this.goToPhase('manana', () => {
-          this.day++;
+          state.day++;
           this.player.body.body.reset(STAIRS_SPOT.x, STAIRS_SPOT.y + 6);
         });
     }
@@ -240,10 +262,25 @@ export default class LibraryScene extends Phaser.Scene {
     this.askedAt = spot;
     this.player.stop();
     this.setAction(null);
-    this.ui.showChoice(this.player.x, this.player.y - QUESTION_OFFSET, question, [
-      { label: 'Sí', principal: true, onClick: onYes },
-      { label: 'No', onClick: () => {} },
-    ]);
+    this.ui.showChoice(
+      this.player.x,
+      this.player.y - QUESTION_OFFSET,
+      question,
+      options ?? [
+        { label: 'Sí', principal: true, onClick: onYes },
+        { label: 'No', onClick: () => {} },
+      ],
+    );
+  }
+
+  // Sale por la puerta a la calle del barrio
+  goToTown() {
+    this.transitioning = true;
+    this.player.stop();
+    this.setAction(null);
+    this.ui.showHint(null);
+    this.cameras.main.fadeOut(FADE_TIME, 20, 14, 10);
+    this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('TownScene'));
   }
 
   // ---------- Clientes ----------
@@ -274,8 +311,8 @@ export default class LibraryScene extends Phaser.Scene {
 
     this.ui.openServe(customer.data, (served) => {
       const result = serveResult(customer.data, served);
-      this.yen += result.yenes;
-      this.ui.setYen(this.yen, true);
+      state.yen += result.yenes;
+      this.ui.setYen(state.yen, true);
       this.ui.floatText(customer.x, customer.y - FLOAT_OFFSET, `+${result.yenes} ¥`);
       this.customers.served(customer);
       // Cuando has leído su reacción, se sienta o se marcha
@@ -300,7 +337,7 @@ export default class LibraryScene extends Phaser.Scene {
       this.setAction(null);
       this.ui.showHint(
         this.phase === 'tarde'
-          ? 'Tarde: pronto podrás salir al barrio. Ve a la puerta para abrir de noche'
+          ? 'Tarde: ve a la puerta para salir al barrio o abrir de noche'
           : 'Noche: pronto llegarán los espíritus. Ve a la cortina del fondo para dormir',
       );
       return;

@@ -363,3 +363,16 @@
   color: var(--tinta) !important;
   box-shadow: 0 3px 0 var(--tinta-suave);
 }
+
+/* Botón del mapa, debajo del día y la fase */
+.boton-mapa {
+  position: absolute;
+  top: calc(2.5% + 2.6em);
+  right: 2%;
+  padding: 0.35em 0.8em;
+  background: var(--papel);
+  border: 2px solid var(--tinta-suave);
+  border-radius: 999px;
+  box-shadow: 0 2px 0 var(--sombra);
+  font-weight: 800 !important;
+}
