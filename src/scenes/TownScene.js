@@ -37,6 +37,12 @@ export default class TownScene extends Phaser.Scene {
     super('TownScene');
   }
 
+  preload() {
+    for (const b of BUILDINGS) {
+      if (b.imagen) this.load.image(`edificio-${b.id}`, `assets/${b.imagen.archivo}`);
+    }
+  }
+
   create() {
     const { width, height } = TOWN_SIZE;
     this.physics.world.setBounds(0, 0, width, height);
@@ -155,6 +161,15 @@ export default class TownScene extends Phaser.Scene {
     const up = (p, dy) => ({ x: p.x, y: p.y - dy });
 
     for (const b of BUILDINGS) {
+      if (b.imagen) {
+        // Edificio con dibujo: la imagen se apoya en la esquina delantera de su planta
+        const corner = toIso(b.x + b.w, b.y + b.h);
+        const view = this.add.image(corner.x, corner.y, `edificio-${b.id}`).setOrigin(b.imagen.origen.x, b.imagen.origen.y);
+        this.addObstacle(b.x, b.y, b.w, b.h);
+        this.buildings.push({ ...b, graphics: view });
+        continue;
+      }
+
       const wallHeight = b.id === 'bloque' ? 90 : 32;
       const c = isoCorners(b.x, b.y, b.w, b.h);
       const g = this.add.graphics();

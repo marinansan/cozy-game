@@ -78,9 +78,25 @@ export const PATHS = [
 export const PATH_WIDTH = 26;
 
 // Edificios: x, y, ancho, alto = la planta (lo que choca); tejado = altura del tejado por encima.
-// Desde el sur se ve la fachada; si pasas por detrás, el tejado te tapa.
+// Si pasas por detrás, el edificio te tapa.
+//
+// imagen (opcional): dibujo del edificio en lugar de la caja de colores.
+// - archivo: en public/assets/
+// - origen: punto de la imagen (de 0 a 1) que coincide con la esquina delantera de la base
+//   (la de abajo del rombo); así la imagen queda bien apoyada sobre el suelo.
 export const BUILDINGS = [
-  { id: 'libreria', nombre: 'Librería', x: 730, y: 1000, w: 140, h: 60, tejado: 50, pared: 0xc9a27a, techo: 0x4a3b5c },
+  {
+    id: 'libreria',
+    nombre: 'Librería',
+    x: 774,
+    y: 982,
+    w: 58,
+    h: 78,
+    tejado: 50,
+    pared: 0xc9a27a,
+    techo: 0x4a3b5c,
+    imagen: { archivo: 'libreria-exterior.png', origen: { x: 0.4866, y: 0.9658 } },
+  },
   { id: 'casaOeste', nombre: 'Casa antigua', x: 250, y: 430, w: 120, h: 50, tejado: 45, pared: 0xb89a7a, techo: 0x5a4a4a },
   { id: 'casaSuroeste', nombre: 'Casa antigua', x: 330, y: 980, w: 110, h: 50, tejado: 40, pared: 0xb08f6e, techo: 0x56463f },
   { id: 'bloque', nombre: 'Bloque moderno a medio construir', x: 1260, y: 990, w: 190, h: 110, tejado: 60, pared: 0x9a9a9a, techo: 0x7d7d7d },
