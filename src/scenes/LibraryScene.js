@@ -9,6 +9,7 @@ import {
   STAIRS_SPOT,
 } from '../data/libraryLayout.js';
 import { PHASES } from '../data/phases.js';
+import { VIEW, ZOOM } from '../config.js';
 import { state } from '../systems/GameState.js';
 import { serveResult } from '../systems/cafe.js';
 import Pathfinder from '../systems/Pathfinder.js';
@@ -37,12 +38,15 @@ export default class LibraryScene extends Phaser.Scene {
   }
 
   preload() {
-    this.load.image(LIBRARY_BACKGROUND, 'assets/libreria.png');
+    // Imagen original, sin reducir, para que conserve todo su detalle
+    this.load.image(LIBRARY_BACKGROUND, 'assets/libreria-interior.webp');
   }
 
   create() {
-    const { width, height } = this.scale;
-    this.add.image(0, 0, LIBRARY_BACKGROUND).setOrigin(0).setDepth(-1);
+    const { width, height } = VIEW;
+    // La cámara aumenta la vista de 640 x 360 a la resolución real del juego
+    this.cameras.main.setZoom(ZOOM).centerOn(width / 2, height / 2);
+    this.add.image(0, 0, LIBRARY_BACKGROUND).setOrigin(0).setDisplaySize(width, height).setDepth(-1);
 
     this.createObstacles();
 
@@ -92,7 +96,7 @@ export default class LibraryScene extends Phaser.Scene {
 
   // Color de cada fase (una capa que tiñe la escena) y lámparas que brillan de noche
   createLighting() {
-    const { width, height } = this.scale;
+    const { width, height } = VIEW;
     this.tint = this.add
       .rectangle(0, 0, width, height, 0xffffff)
       .setOrigin(0)
@@ -137,9 +141,9 @@ export default class LibraryScene extends Phaser.Scene {
     // PC: hacer clic para caminar hasta ese punto
     this.input.on('pointerdown', (pointer) => {
       if (pointer.wasTouch || this.isBusy()) return;
-      const path = this.pathfinder.findPath(this.player.x, this.player.y, pointer.x, pointer.y);
+      const path = this.pathfinder.findPath(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
       this.player.walkTo(path);
-      this.showTapMarker(pointer.x, pointer.y);
+      this.showTapMarker(pointer.worldX, pointer.worldY);
     });
 
     this.keys = this.input.keyboard.addKeys('up,down,left,right,w,a,s,d');

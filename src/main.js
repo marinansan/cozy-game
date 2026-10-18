@@ -1,16 +1,18 @@
 import Phaser from 'phaser';
+import { RENDER, VIEW } from './config.js';
 import LibraryScene from './scenes/LibraryScene.js';
 import TownScene from './scenes/TownScene.js';
 
-// Resolución base del juego (16:9, horizontal). Phaser la escala para
-// que encaje en cualquier pantalla, de PC o de móvil.
+// El juego dibuja a 1920 x 1080 (horizontal) y Phaser lo escala para que encaje
+// en cualquier pantalla, de PC o de móvil. Ver src/config.js.
 const config = {
   type: Phaser.AUTO,
   parent: 'game',
-  width: 640,
-  height: 360,
+  width: RENDER.width,
+  height: RENDER.height,
   backgroundColor: '#1e1b18',
-  pixelArt: true,
+  // Suavizado activado: las imágenes de arte ya tienen su propio detalle de píxel
+  antialias: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
@@ -34,7 +36,7 @@ function syncUi() {
     width: `${rect.width}px`,
     height: `${rect.height}px`,
   });
-  ui.style.setProperty('--u', `${rect.height / config.height}px`);
+  ui.style.setProperty('--u', `${rect.height / VIEW.height}px`);
 }
 game.events.once('ready', syncUi);
 game.scale.on('resize', () => requestAnimationFrame(syncUi));

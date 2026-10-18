@@ -15,6 +15,7 @@ import {
   TREES,
 } from '../data/townLayout.js';
 import { PHASES } from '../data/phases.js';
+import { ART_RESOLUTION, ZOOM } from '../config.js';
 import { state } from '../systems/GameState.js';
 import { ISO_SIZE, isoCorners, screenToPlane, toIso, toPlane } from '../systems/iso.js';
 import Pathfinder from '../systems/Pathfinder.js';
@@ -72,6 +73,7 @@ export default class TownScene extends Phaser.Scene {
 
     // Cámara: sigue al personaje sin salirse del barrio
     this.cameras.main.setBounds(0, 0, ISO_SIZE.width, ISO_SIZE.height);
+    this.cameras.main.setZoom(ZOOM);
     this.cameras.main.setBackgroundColor(FOREST_COLOR);
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
     this.mapView = false;
@@ -164,7 +166,10 @@ export default class TownScene extends Phaser.Scene {
       if (b.imagen) {
         // Edificio con dibujo: la imagen se apoya en la esquina delantera de su planta
         const corner = toIso(b.x + b.w, b.y + b.h);
-        const view = this.add.image(corner.x, corner.y, `edificio-${b.id}`).setOrigin(b.imagen.origen.x, b.imagen.origen.y);
+        const view = this.add
+          .image(corner.x, corner.y, `edificio-${b.id}`)
+          .setOrigin(b.imagen.origen.x, b.imagen.origen.y)
+          .setScale(1 / ART_RESOLUTION); // la imagen está a 3 veces la resolución del juego
         this.addObstacle(b.x, b.y, b.w, b.h);
         this.buildings.push({ ...b, graphics: view });
         continue;
@@ -457,7 +462,7 @@ export default class TownScene extends Phaser.Scene {
       this.ui.showHint('Así se ve el barrio de lejos. La niebla oculta lo que aún no recuerdas.');
     } else {
       const target = this.player.sprite;
-      camera.zoomTo(1, 500, 'Sine.easeInOut');
+      camera.zoomTo(ZOOM, 500, 'Sine.easeInOut');
       camera.pan(target.x, target.y, 500, 'Sine.easeInOut', false, (_cam, progress) => {
         if (progress === 1) {
           camera.setBounds(0, 0, ISO_SIZE.width, ISO_SIZE.height);
@@ -468,12 +473,12 @@ export default class TownScene extends Phaser.Scene {
     }
   }
 
-  // Convierte un punto del plano en posición de la pantalla (para bocadillos)
+  // Convierte un punto del plano en posición de la vista de 640 x 360 (para bocadillos)
   toScreen(x, y) {
     const p = toIso(x, y);
     const view = this.cameras.main.worldView;
-    const zoom = this.cameras.main.zoom;
-    return { x: (p.x - view.x) * zoom, y: (p.y - view.y) * zoom };
+    const scale = this.cameras.main.zoom / ZOOM;
+    return { x: (p.x - view.x) * scale, y: (p.y - view.y) * scale };
   }
 
   setAction(label, callback) {
