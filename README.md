@@ -15,3 +15,8 @@ Juego cozy de una librería-cafetería mágica en un barrio japonés que recuper
 ## Tecnología
 
 Phaser 3 (juego web en JavaScript). Plataformas iniciales: navegador en PC y móvil, en horizontal.
+
+## Cómo probar el juego
+
+- **En la web:** https://marinansan.github.io/cozy-game/ (se actualiza solo con cada cambio en `main`).
+- **En local:** `npm install` y después `npm run dev`; abre la dirección que aparece en la terminal.
