@@ -57,6 +57,7 @@ export default class LibraryScene extends Phaser.Scene {
     this.customers = new CustomerManager(this, this.pathfinder);
     this.yen = 0;
     this.day = 1;
+    this.neighborhoodStage = 0; // crecerá al recuperar recuerdos (pasos 5 y 6)
     this.currentAction = null;
     this.transitioning = false;
     this.askedAt = null; // punto donde ya se ha hecho la pregunta (para no repetirla)
@@ -180,7 +181,7 @@ export default class LibraryScene extends Phaser.Scene {
       if (phase.luces) lamp.setTint(phase.luces);
     }
 
-    if (phaseId === 'manana') this.customers.startDay();
+    if (phaseId === 'manana') this.customers.startDay(this.neighborhoodStage);
   }
 
   // Fundido a negro, cambio de fase y vuelta a la luz

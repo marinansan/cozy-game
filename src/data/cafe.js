@@ -120,13 +120,21 @@ export const CUSTOMERS = [
 
 // Visitantes de ambiente: no piden nada, solo dan vida a la librería.
 // Entran, curiosean en las estanterías, se sientan un rato y se van.
-// actividad: lo que hacen sentados ('leer' o 'tomar'); se ve con iconos sobre la cabeza
 export const VISITORS = [
-  { nombre: 'Estudiante', colores: { cuerpo: 0x8fa36b, pelo: 0x2b2018 }, actividad: 'leer' },
-  { nombre: 'Señora con sombrero', colores: { cuerpo: 0xb07a5a, pelo: 0x6b4a3a }, actividad: 'leer' },
-  { nombre: 'Chico con auriculares', colores: { cuerpo: 0x5a6b8f, pelo: 0x1f1a17 }, actividad: 'tomar' },
+  { nombre: 'Estudiante', colores: { cuerpo: 0x8fa36b, pelo: 0x2b2018 } },
+  { nombre: 'Señora con sombrero', colores: { cuerpo: 0xb07a5a, pelo: 0x6b4a3a } },
+  { nombre: 'Chico con auriculares', colores: { cuerpo: 0x5a6b8f, pelo: 0x1f1a17 } },
 ];
 
-// Cuántos visitantes de ambiente vienen cada mañana y cuántas personas puede haber dentro a la vez
-export const VISITORS_PER_DAY = 3;
-export const MAX_PEOPLE_INSIDE = 6;
+// Cuánta gente viene cada mañana según lo que ha crecido el barrio.
+// Al principio de la historia la librería está casi vacía; con cada etapa llega más vida.
+// - clientes: personas que piden algo (con "!")
+// - visitantes: personas que solo curiosean y se sientan (sin interacción)
+// - maxDentro: cuántas personas puede haber a la vez
+// - llegadaCada: segundos aproximados entre una llegada y la siguiente
+export const NEIGHBORHOOD_STAGES = [
+  { clientes: 2, visitantes: 1, maxDentro: 3, llegadaCada: { min: 15, max: 25 } }, // etapa 0: inicio de la historia
+  { clientes: 3, visitantes: 1, maxDentro: 4, llegadaCada: { min: 12, max: 20 } },
+  { clientes: 4, visitantes: 2, maxDentro: 5, llegadaCada: { min: 9, max: 15 } },
+  { clientes: 6, visitantes: 3, maxDentro: 6, llegadaCada: { min: 6, max: 10 } },
+];

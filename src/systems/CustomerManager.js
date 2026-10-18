@@ -1,14 +1,12 @@
 import Phaser from 'phaser';
 import { BROWSE_SPOTS, COUNTER_SPOT, DOOR, SEATS } from '../data/libraryLayout.js';
-import { CUSTOMERS, MAX_PEOPLE_INSIDE, VISITORS, VISITORS_PER_DAY } from '../data/cafe.js';
+import { CUSTOMERS, NEIGHBORHOOD_STAGES, VISITORS } from '../data/cafe.js';
 import Customer from '../objects/Customer.js';
 
-// Ritmo de llegada: pausado pero no lento
-const ARRIVAL_EVERY = { min: 6000, max: 10000 }; // milisegundos entre llegadas
+// El ritmo de llegada y cuánta gente viene dependen de la etapa del barrio (src/data/cafe.js)
 const COUNTER_REST = { min: 4000, max: 8000 }; // pausa tras atender antes de que llegue otra persona al mostrador
 const BROWSE_TIME = { min: 4000, max: 8000 }; // tiempo mirando una estantería
 const SEATED_TIME = { min: 35000, max: 60000 }; // tiempo sentado leyendo o tomando algo
-const EMOTE_EVERY = { min: 4000, max: 9000 }; // cada cuánto aparece un icono sobre quien está sentado
 
 const between = ({ min, max }) => Phaser.Math.Between(min, max);
 
@@ -36,9 +34,11 @@ export default class CustomerManager {
 
   // ---------- Día ----------
 
-  startDay() {
-    this.todayCustomers = Phaser.Utils.Array.Shuffle([...CUSTOMERS]);
-    this.todayVisitors = Phaser.Utils.Array.Shuffle([...VISITORS]).slice(0, VISITORS_PER_DAY);
+  // stage: etapa del barrio (0 = inicio de la historia)
+  startDay(stage = 0) {
+    this.stage = NEIGHBORHOOD_STAGES[Math.min(stage, NEIGHBORHOOD_STAGES.length - 1)];
+    this.todayCustomers = Phaser.Utils.Array.Shuffle([...CUSTOMERS]).slice(0, this.stage.clientes);
+    this.todayVisitors = Phaser.Utils.Array.Shuffle([...VISITORS]).slice(0, this.stage.visitantes);
     this.counterFreeAt = 0;
     this.scheduleArrival(1500);
   }
@@ -74,7 +74,7 @@ export default class CustomerManager {
     return this.todayCustomers.length > 0 || this.todayVisitors.length > 0;
   }
 
-  scheduleArrival(delay = between(ARRIVAL_EVERY)) {
+  scheduleArrival(delay = between(this.stage.llegadaCada) * 1000) {
     this.arrivalTimer?.remove();
     this.arrivalTimer = this.scene.time.delayedCall(delay, () => this.tryArrival());
   }
@@ -82,7 +82,7 @@ export default class CustomerManager {
   // Decide quién entra ahora (si hay sitio) y programa la siguiente llegada
   tryArrival() {
     if (!this.moreToday()) return;
-    if (this.people.length < MAX_PEOPLE_INSIDE) {
+    if (this.people.length < this.stage.maxDentro) {
       const next = this.pickNextArrival();
       if (next) this.arrive(next.data, next.isVisitor);
     }
@@ -216,7 +216,6 @@ export default class CustomerManager {
       person.walk([{ x: seat.x, y: seat.y }], () => {
         person.state = 'seated';
         person.startIdle('sentado');
-        this.scheduleEmote(person);
         this.scene.time.delayedCall(between(SEATED_TIME), () => {
           // Se levanta: vuelve al punto libre junto a la silla y se marcha
           person.state = 'standing';
@@ -228,21 +227,6 @@ export default class CustomerManager {
       });
     });
     return true;
-  }
-
-  // Iconos de ambiente mientras está sentado: lo que hace (leer o tomar algo) y a veces un detalle
-  scheduleEmote(person) {
-    this.scene.time.delayedCall(between(EMOTE_EVERY), () => {
-      if (person.state !== 'seated') return;
-      const main = this.activityOf(person) === 'leer' ? 'libro' : 'taza';
-      person.showEmote(Math.random() < 0.7 ? main : Phaser.Utils.Array.GetRandom(['nota', 'corazon']));
-      this.scheduleEmote(person);
-    });
-  }
-
-  activityOf(person) {
-    if (person.isVisitor) return person.data.actividad;
-    return person.data.pide.libro ? 'leer' : 'tomar';
   }
 
   leave(person) {

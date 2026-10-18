@@ -2,35 +2,6 @@ import { createFigure } from './figure.js';
 
 const SPEED = 55; // píxeles por segundo
 
-// Iconos de ambiente dibujados con píxeles: [x, y, ancho, alto, color]
-const EMOTES = {
-  taza: [
-    [-3, -2, 6, 5, 0xfffaf2],
-    [3, -1, 2, 3, 0xfffaf2],
-    [-2, -1, 4, 1, 0x8a5a3b],
-    [-1, -5, 1, 2, 0xd9d4cc],
-    [1, -6, 1, 2, 0xd9d4cc],
-  ],
-  libro: [
-    [-4, -3, 4, 6, 0x6b8f71],
-    [0, -3, 4, 6, 0x6b8f71],
-    [-3, -2, 3, 4, 0xfffaf2],
-    [0, -2, 3, 4, 0xfffaf2],
-  ],
-  nota: [
-    [1, -5, 1, 7, 0xc4b0ff],
-    [-2, 0, 3, 3, 0xc4b0ff],
-    [2, -5, 2, 2, 0xc4b0ff],
-  ],
-  corazon: [
-    [-3, -3, 2, 2, 0xe07a8f],
-    [1, -3, 2, 2, 0xe07a8f],
-    [-3, -2, 6, 2, 0xe07a8f],
-    [-2, 0, 4, 1, 0xe07a8f],
-    [-1, 1, 2, 1, 0xe07a8f],
-  ],
-};
-
 // Un cliente: entra por la puerta, camina por la librería, puede mostrar
 // una señal "!" cuando quiere hablar contigo, sentarse y marcharse.
 export default class Customer {
@@ -67,23 +38,6 @@ export default class Customer {
 
   showAlert(visible) {
     this.alert.setVisible(visible);
-  }
-
-  // Muestra un icono pequeño sobre la cabeza que sube y se desvanece
-  showEmote(kind) {
-    const pixels = EMOTES[kind].map(([x, y, w, h, color]) =>
-      this.scene.add.rectangle(x, y, w, h, color).setOrigin(0),
-    );
-    const emote = this.scene.add.container(this.x + 6, this.y - 26, pixels).setDepth(600).setAlpha(0);
-    this.scene.tweens.add({
-      targets: emote,
-      y: emote.y - 6,
-      alpha: { from: 0, to: 1 },
-      duration: 500,
-      hold: 1200,
-      yoyo: true,
-      onComplete: () => emote.destroy(),
-    });
   }
 
   // Gestos de ambiente cuando está quieto: respirar (sentado) o curiosear (en las estanterías)

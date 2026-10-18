@@ -75,6 +75,11 @@ Juego *cozy* de gestión, exploración y construcción. Heredas la librería-caf
 - Recompensa: **recuerdos**, la niebla retrocede, una huella en el barrio y llega un vecino de día.
 - Si te equivocas, el espíritu reacciona con cariño y da otra pista.
 
+### Afluencia progresiva
+- Al principio de la historia la librería está casi vacía: cada mañana vienen **3 personas** (2 clientes con "!" en momentos distintos y 1 visitante sin interacción).
+- A medida que crece el barrio (etapas ligadas a los recuerdos recuperados) llega más gente: más clientes, más visitantes y llegadas más seguidas. Tabla en `src/data/cafe.js` (`NEIGHBORHOOD_STAGES`).
+- Nunca hay cola: solo una persona en el mostrador cada vez. Solo se muestra el "!" de quien quiere hablar.
+
 ## 8. Recursos
 
 | Recurso | Cómo se consigue | Para qué sirve |
