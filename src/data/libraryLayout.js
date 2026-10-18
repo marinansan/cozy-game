@@ -27,8 +27,33 @@ export const LAMPS = [
   { x: 605, y: 275, radio: 26 }, // farolillo de la pared derecha
 ];
 
-// Sitio donde espera el cliente, delante del mostrador
-export const CUSTOMER_SPOT = { x: 405, y: 174 };
+// Cola delante del mostrador: el primero es quien pide
+export const QUEUE_SPOTS = [
+  { x: 405, y: 174 },
+  { x: 405, y: 194 },
+  { x: 405, y: 214 },
+];
+
+// Sitios delante de las estanterías donde los clientes miran libros
+export const BROWSE_SPOTS = [
+  { x: 180, y: 128 },
+  { x: 240, y: 128 },
+  { x: 300, y: 126 },
+  { x: 112, y: 200 },
+  { x: 460, y: 215 },
+  { x: 135, y: 268 },
+];
+
+// Asientos: x, y = dónde se sienta · llegada = punto libre desde el que se acerca a la silla
+export const SEATS = [
+  { x: 218, y: 200, llegada: { x: 205, y: 200 } },
+  { x: 218, y: 228, llegada: { x: 205, y: 228 } },
+  { x: 303, y: 200, llegada: { x: 318, y: 200 } },
+  { x: 303, y: 228, llegada: { x: 318, y: 228 } },
+  { x: 376, y: 262, llegada: { x: 356, y: 262 } },
+  { x: 436, y: 262, llegada: { x: 454, y: 262 } },
+  { x: 145, y: 158, llegada: { x: 172, y: 165 } },
+];
 
 export const LIBRARY_OBSTACLES = [
   // Paredes

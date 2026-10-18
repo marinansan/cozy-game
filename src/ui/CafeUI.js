@@ -1,4 +1,4 @@
-import { BOOKS, INGREDIENTS } from '../data/cafe.js';
+import { BOOKS, FOODS, INGREDIENTS } from '../data/cafe.js';
 import { drinkName } from '../systems/cafe.js';
 import './ui.css';
 
@@ -78,6 +78,7 @@ export default class CafeUI {
 
   // Bocadillo de diálogo por páginas: el texto se escribe letra a letra
   // y se pasa a la siguiente frase tocando el bocadillo (o con E / espacio).
+  // Tocar en la última frase cierra el bocadillo.
   // onFinished se llama cuando se ha mostrado la última página.
   showBubble(x, y, name, pages, onFinished) {
     this.hideBubble();
@@ -115,7 +116,7 @@ export default class CafeUI {
     d.typing = false;
     d.textEl.textContent = d.pages[d.page];
     const isLast = d.page === d.pages.length - 1;
-    d.arrow.hidden = isLast;
+    d.arrow.hidden = false; // en la última frase, tocar cierra el bocadillo
     if (isLast && d.onFinished) {
       const done = d.onFinished;
       d.onFinished = null;
@@ -136,7 +137,50 @@ export default class CafeUI {
       this.typePage();
       return true;
     }
-    return false;
+    // Última frase ya leída: se cierra el bocadillo
+    this.hideBubble();
+    return true;
+  }
+
+  // Pregunta con botones (p. ej. "¿Cerrar la tienda?" Sí / No), por encima del punto indicado
+  showChoice(x, y, text, options) {
+    this.hideChoice();
+    this.choice = this.add('div', 'bocadillo arriba eleccion interactivo');
+    this.add('span', 'texto', this.choice).textContent = text;
+    const buttons = this.add('div', 'botones', this.choice);
+    for (const option of options) {
+      const button = this.add('button', option.principal ? 'boton' : 'boton secundario', buttons);
+      button.textContent = option.label;
+      button.onclick = (event) => {
+        event.stopPropagation();
+        this.hideChoice();
+        option.onClick();
+      };
+    }
+    this.choiceOptions = options;
+    this.place(this.choice, x, y);
+  }
+
+  isChoiceOpen() {
+    return Boolean(this.choice);
+  }
+
+  // Teclado: la primera opción (Sí) o la última (No)
+  pickChoice(index) {
+    const option = this.choiceOptions?.at(index);
+    if (!option) return;
+    this.hideChoice();
+    option.onClick();
+  }
+
+  hideChoice() {
+    this.choice?.remove();
+    this.choice = null;
+    this.choiceOptions = null;
+  }
+
+  isBubbleOpen() {
+    return Boolean(this.bubble);
   }
 
   hideBubble() {
@@ -157,19 +201,47 @@ export default class CafeUI {
     return this.panel !== null;
   }
 
-  // Abre el panel de atención. Al terminar llama a onDone(ingredientes, libro).
+  // Abre el panel de atención con los pasos que necesite el cliente
+  // (bebida, comida y/o libro). Al terminar llama a onDone({ bebida, comida, libro }).
   openServe(customer, onDone) {
     this.panel = this.add('div', 'fondo-panel interactivo');
     const card = this.add('div', 'panel', this.panel);
-    this.showDrinkStep(card, customer, (ingredients) => {
-      this.showPreparing(card, ingredients, () => {
-        this.showBookStep(card, customer, ingredients, (book) => {
-          this.panel.remove();
-          this.panel = null;
-          onDone(ingredients, book);
-        });
-      });
-    });
+    const served = {};
+    const steps = [];
+    if (customer.pide.bebida) {
+      steps.push((next) =>
+        this.showDrinkStep(card, customer, (ingredients) => {
+          served.bebida = ingredients;
+          this.showPreparing(card, ingredients, next);
+        }),
+      );
+    }
+    if (customer.pide.comida) {
+      steps.push((next) =>
+        this.showFoodStep(card, customer, (food) => {
+          served.comida = food;
+          next();
+        }),
+      );
+    }
+    if (customer.pide.libro) {
+      steps.push((next) =>
+        this.showBookStep(card, customer, (book) => {
+          served.libro = book;
+          next();
+        }),
+      );
+    }
+    const run = (index) => {
+      if (index < steps.length) {
+        steps[index](() => run(index + 1));
+        return;
+      }
+      this.panel.remove();
+      this.panel = null;
+      onDone(served);
+    };
+    run(0);
   }
 
   header(card, title, customer) {
@@ -219,8 +291,18 @@ export default class CafeUI {
     setTimeout(next, 1100);
   }
 
-  showBookStep(card, customer, ingredients, next) {
-    this.header(card, `📚 Elige un libro para acompañar: ${drinkName(ingredients).toLowerCase()}`, customer);
+  showFoodStep(card, customer, next) {
+    this.header(card, '🍙 Elige algo de comer', customer);
+    const options = this.add('div', 'opciones', card);
+    for (const food of FOODS) {
+      const option = this.add('button', 'opcion', options);
+      option.innerHTML = `<span class="icono">${food.icono}</span>${food.nombre}`;
+      option.onclick = () => next(food.id);
+    }
+  }
+
+  showBookStep(card, customer, next) {
+    this.header(card, '📚 Recomienda un libro', customer);
     const options = this.add('div', 'opciones', card);
     for (const book of BOOKS) {
       const option = this.add('button', 'opcion libro', options);

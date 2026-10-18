@@ -1,8 +1,6 @@
 import Phaser from 'phaser';
 import {
   BARISTA_ZONE,
-  CUSTOMER_SPOT,
-  DOOR,
   LAMPS,
   LIBRARY_BACKGROUND,
   LIBRARY_OBSTACLES,
@@ -10,18 +8,18 @@ import {
   SIGN_SPOT,
   STAIRS_SPOT,
 } from '../data/libraryLayout.js';
-import { CUSTOMERS } from '../data/cafe.js';
 import { PHASES } from '../data/phases.js';
 import { serveResult } from '../systems/cafe.js';
 import Pathfinder from '../systems/Pathfinder.js';
+import CustomerManager from '../systems/CustomerManager.js';
 import Player from '../objects/Player.js';
-import Customer from '../objects/Customer.js';
 import VirtualJoystick from '../ui/VirtualJoystick.js';
 import CafeUI from '../ui/CafeUI.js';
 
-const BUBBLE_OFFSET = 6; // el bocadillo aparece debajo del cliente, para no tapar el mostrador
+const BUBBLE_OFFSET = 6; // el bocadillo aparece debajo del cliente
 const FLOAT_OFFSET = 24; // el texto de yenes sale por encima de la cabeza
-const NEXT_CUSTOMER_DELAY = 2000; // milisegundos entre un cliente y el siguiente
+const QUESTION_OFFSET = 26; // la pregunta (Sí / No) sale por encima del personaje
+const TALK_REACH = 30; // distancia para hablar con alguien en las estanterías
 const FADE_TIME = 600; // milisegundos del fundido entre fases
 
 // Interior de la librería-cafetería: el personaje camina por ella, atiende a los clientes
@@ -56,13 +54,12 @@ export default class LibraryScene extends Phaser.Scene {
     this.createControls();
 
     this.ui = new CafeUI(document.getElementById('ui'));
+    this.customers = new CustomerManager(this, this.pathfinder);
     this.yen = 0;
     this.day = 1;
-    this.customer = null;
-    this.customerState = 'none'; // none · walking · talking · waiting · serving · leaving
-    this.spawnTimer = null;
     this.currentAction = null;
     this.transitioning = false;
+    this.askedAt = null; // punto donde ya se ha hecho la pregunta (para no repetirla)
 
     this.startPhase('manana');
   }
@@ -92,12 +89,20 @@ export default class LibraryScene extends Phaser.Scene {
       .setDepth(500)
       .setBlendMode(Phaser.BlendModes.MULTIPLY);
 
-    // Textura de brillo suave, de centro claro a bordes transparentes
+    // Luz de ambiente que se suma por encima (de noche, un brillo azul y morado)
+    this.ambient = this.add
+      .rectangle(0, 0, width, height, 0x000000)
+      .setOrigin(0)
+      .setDepth(500)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setAlpha(0);
+
+    // Textura de brillo suave, de centro claro a bordes transparentes (el color lo pone cada fase)
     const glow = this.textures.createCanvas('glow', 64, 64);
     const ctx = glow.getContext();
     const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-    gradient.addColorStop(0, 'rgba(255, 200, 120, 0.9)');
-    gradient.addColorStop(1, 'rgba(255, 200, 120, 0)');
+    gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 64, 64);
     glow.refresh();
@@ -118,7 +123,7 @@ export default class LibraryScene extends Phaser.Scene {
 
     // PC: hacer clic para caminar hasta ese punto
     this.input.on('pointerdown', (pointer) => {
-      if (pointer.wasTouch || this.ui.isPanelOpen() || this.transitioning) return;
+      if (pointer.wasTouch || this.isBusy()) return;
       const path = this.pathfinder.findPath(this.player.x, this.player.y, pointer.x, pointer.y);
       this.player.walkTo(path);
       this.showTapMarker(pointer.x, pointer.y);
@@ -126,14 +131,19 @@ export default class LibraryScene extends Phaser.Scene {
 
     this.keys = this.input.keyboard.addKeys('up,down,left,right,w,a,s,d');
 
-    // PC: E o espacio para avanzar el diálogo o usar el botón de acción
+    // PC: E o espacio para avanzar el diálogo, responder "Sí" o usar el botón de acción
     const pressAction = () => {
       if (this.ui.isPanelOpen() || this.transitioning) return;
+      if (this.ui.isChoiceOpen()) {
+        this.ui.pickChoice(0);
+        return;
+      }
       if (this.ui.advanceBubble()) return;
       this.currentAction?.();
     };
     this.input.keyboard.on('keydown-E', pressAction);
     this.input.keyboard.on('keydown-SPACE', pressAction);
+    this.input.keyboard.on('keydown-ESC', () => this.ui.isChoiceOpen() && this.ui.pickChoice(-1));
 
     // Modo depuración: muestra obstáculos y zonas (Mayús + D o ?debug en la dirección)
     this.debugGraphics.setVisible(new URLSearchParams(window.location.search).has('debug'));
@@ -142,11 +152,17 @@ export default class LibraryScene extends Phaser.Scene {
     });
   }
 
+  // Mientras hay un menú, una pregunta o un fundido, el personaje no se mueve
+  isBusy() {
+    return this.ui.isPanelOpen() || this.ui.isChoiceOpen() || this.transitioning;
+  }
+
   // ---------- Fases del día ----------
 
   startPhase(phaseId) {
     const phase = PHASES[phaseId];
     this.phase = phaseId;
+    this.askedAt = null;
     this.ui.setStatus(this.day, phase);
     this.ui.showTitle(phaseId === 'manana' ? `Día ${this.day} · ${phase.icono} ${phase.nombre}` : `${phase.icono} ${phase.nombre}`);
 
@@ -158,12 +174,13 @@ export default class LibraryScene extends Phaser.Scene {
       phase.fuerza * 100,
     );
     this.tint.setFillStyle(Phaser.Display.Color.GetColor(color.r, color.g, color.b));
-    for (const lamp of this.lamps) lamp.setAlpha(phase.luces ? 0.55 : 0);
-
-    if (phaseId === 'manana') {
-      this.customerIndex = 0;
-      this.spawnTimer = this.time.delayedCall(1500, () => this.spawnCustomer());
+    this.ambient.setFillStyle(phase.ambiente ?? 0x000000).setAlpha(phase.ambiente ? phase.brillo : 0);
+    for (const lamp of this.lamps) {
+      lamp.setAlpha(phase.luces ? 0.6 : 0);
+      if (phase.luces) lamp.setTint(phase.luces);
     }
+
+    if (phaseId === 'manana') this.customers.startDay();
   }
 
   // Fundido a negro, cambio de fase y vuelta a la luz
@@ -185,20 +202,47 @@ export default class LibraryScene extends Phaser.Scene {
     });
   }
 
-  closeShop() {
-    this.spawnTimer?.remove();
-    this.goToPhase('tarde');
-  }
+  // Al llegar a la puerta o a la cortina, un bocadillo pregunta si quieres pasar de fase.
+  // Si dices que no, no vuelve a preguntar hasta que te alejes y vuelvas.
+  updateQuestions() {
+    const spot = this.phase === 'noche' ? STAIRS_SPOT : SIGN_SPOT;
+    const near = this.isNear(spot);
+    if (!near) {
+      if (this.askedAt === spot) this.askedAt = null;
+      return;
+    }
+    if (this.askedAt === spot || this.ui.isBubbleOpen()) return;
 
-  openAtNight() {
-    this.goToPhase('noche');
-  }
+    let question;
+    let onYes;
+    if (this.phase === 'manana') {
+      if (!this.customers.isEmpty()) return; // no se cierra con clientes dentro
+      question = this.customers.moreToday()
+        ? 'Aún pueden venir clientes… ¿Cerrar la tienda igualmente?'
+        : '¿Quieres cerrar la tienda por hoy?';
+      onYes = () => {
+        this.customers.stopDay();
+        this.goToPhase('tarde');
+      };
+    } else if (this.phase === 'tarde') {
+      question = '¿Abrir la librería esta noche?';
+      onYes = () => this.goToPhase('noche');
+    } else {
+      question = '¿Subir a casa a dormir?';
+      onYes = () =>
+        this.goToPhase('manana', () => {
+          this.day++;
+          this.player.body.body.reset(STAIRS_SPOT.x, STAIRS_SPOT.y + 6);
+        });
+    }
 
-  sleep() {
-    this.goToPhase('manana', () => {
-      this.day++;
-      this.player.body.body.reset(STAIRS_SPOT.x, STAIRS_SPOT.y + 6);
-    });
+    this.askedAt = spot;
+    this.player.stop();
+    this.setAction(null);
+    this.ui.showChoice(this.player.x, this.player.y - QUESTION_OFFSET, question, [
+      { label: 'Sí', principal: true, onClick: onYes },
+      { label: 'No', onClick: () => {} },
+    ]);
   }
 
   // ---------- Clientes ----------
@@ -212,56 +256,34 @@ export default class LibraryScene extends Phaser.Scene {
     return Phaser.Math.Distance.Between(this.player.x, this.player.y, spot.x, spot.y) <= spot.radio;
   }
 
-  moreCustomersToday() {
-    return this.customerIndex < CUSTOMERS.length;
+  talkTo(customer) {
+    this.player.stop();
+    this.customers.startTalking(customer);
+    this.ui.showBubble(customer.x, customer.y + BUBBLE_OFFSET, customer.data.nombre, customer.data.pedido, () =>
+      this.customers.finishTalking(customer),
+    );
   }
 
-  spawnCustomer() {
-    if (this.phase !== 'manana' || !this.moreCustomersToday()) return;
-    const data = CUSTOMERS[this.customerIndex++];
-    this.customer = new Customer(this, data, DOOR.x, DOOR.y);
-    this.customerState = 'walking';
-    const path = this.pathfinder.findPath(DOOR.x, DOOR.y, CUSTOMER_SPOT.x, CUSTOMER_SPOT.y);
-    this.customer.walk(path, () => {
-      // Cuenta lo que necesita; cuando termina de hablar, ya se le puede atender
-      this.customerState = 'talking';
-      this.ui.showBubble(this.customer.x, this.customer.y + BUBBLE_OFFSET, data.nombre, data.pedido, () => {
-        this.customerState = 'waiting';
-      });
-    });
-  }
-
-  startServing() {
-    if (this.customerState !== 'waiting') return;
-    this.customerState = 'serving';
+  serve(customer) {
     this.player.stop();
     this.setAction(null);
     this.ui.showHint(null);
     this.ui.hideBubble();
+    this.customers.startServing(customer);
 
-    const customer = this.customer;
-    this.ui.openServe(customer.data, (ingredients, book) => {
-      const result = serveResult(customer.data, ingredients, book);
+    this.ui.openServe(customer.data, (served) => {
+      const result = serveResult(customer.data, served);
       this.yen += result.yenes;
       this.ui.setYen(this.yen, true);
       this.ui.floatText(customer.x, customer.y - FLOAT_OFFSET, `+${result.yenes} ¥`);
-      // Se despide cuando has leído toda su reacción (y un momento después)
+      this.customers.served(customer);
+      // Cuando has leído su reacción, se sienta o se marcha
       this.ui.showBubble(customer.x, customer.y + BUBBLE_OFFSET, customer.data.nombre, result.reaccion, () => {
-        this.time.delayedCall(2500, () => this.customerLeaves());
+        this.time.delayedCall(1500, () => {
+          this.ui.hideBubble();
+          this.customers.afterReaction(customer);
+        });
       });
-    });
-  }
-
-  customerLeaves() {
-    this.ui.hideBubble();
-    this.customerState = 'leaving';
-    const customer = this.customer;
-    const path = this.pathfinder.findPath(customer.x, customer.y, DOOR.x, DOOR.y);
-    customer.walk(path, () => {
-      customer.destroy();
-      this.customer = null;
-      this.customerState = 'none';
-      this.spawnTimer = this.time.delayedCall(NEXT_CUSTOMER_DELAY, () => this.spawnCustomer());
     });
   }
 
@@ -272,29 +294,36 @@ export default class LibraryScene extends Phaser.Scene {
     this.ui.showAction(label, callback);
   }
 
-  // Decide qué botón y qué pista mostrar según la fase y dónde estás
   updateActionAndHint() {
-    if (this.phase === 'manana') {
-      if (this.customerState === 'waiting') {
-        const ready = this.isBehindCounter();
-        this.setAction(ready ? '☕ Atender' : null, () => this.startServing());
-        this.ui.showHint(ready ? null : 'Ve detrás del mostrador para atender (entrada por la derecha)');
-        return;
-      }
-      const shopEmpty = this.customerState === 'none';
-      this.setAction(shopEmpty && this.isNear(SIGN_SPOT) ? '🪧 Cerrar la tienda' : null, () => this.closeShop());
-      if (shopEmpty && !this.moreCustomersToday()) {
-        this.ui.showHint('Ya no vienen más clientes. Ve a la puerta para cerrar la tienda 🪧');
-      } else {
-        this.ui.showHint(null);
-      }
-    } else if (this.phase === 'tarde') {
-      this.setAction(this.isNear(SIGN_SPOT) ? '🌙 Abrir de noche' : null, () => this.openAtNight());
-      this.ui.showHint('Tarde: pronto podrás salir al barrio. Ve a la puerta para abrir de noche');
-    } else if (this.phase === 'noche') {
-      this.setAction(this.isNear(STAIRS_SPOT) ? '🛏️ Dormir' : null, () => this.sleep());
-      this.ui.showHint('Noche: pronto llegarán los espíritus. Sube a casa por la cortina del fondo para dormir');
+    if (this.phase !== 'manana') {
+      this.setAction(null);
+      this.ui.showHint(
+        this.phase === 'tarde'
+          ? 'Tarde: pronto podrás salir al barrio. Ve a la puerta para abrir de noche'
+          : 'Noche: pronto llegarán los espíritus. Ve a la cortina del fondo para dormir',
+      );
+      return;
     }
+
+    // Mañana: hablar o atender a la persona más cercana que lo necesite
+    const interaction = this.ui.isBubbleOpen()
+      ? null
+      : this.customers.nearestInteraction(this.player, this.isBehindCounter(), TALK_REACH);
+    if (interaction) {
+      const { customer, kind } = interaction;
+      const atCounter = customer.data.espera === 'mostrador';
+      const label = kind === 'talk' ? '💬 Hablar' : atCounter ? '☕ Atender' : '📚 Recomendar';
+      this.setAction(label, () => (kind === 'talk' ? this.talkTo(customer) : this.serve(customer)));
+    } else {
+      this.setAction(null);
+    }
+
+    const pending = this.customers.pending();
+    if (this.ui.isBubbleOpen() || interaction) this.ui.showHint(null);
+    else if (pending.counter && !this.isBehindCounter()) this.ui.showHint('Hay alguien esperando en el mostrador (entra por la derecha)');
+    else if (pending.shelves) this.ui.showHint('Alguien te llama ❗ en las estanterías');
+    else if (!this.customers.moreToday() && this.customers.isEmpty()) this.ui.showHint('Ya no vienen más clientes. Ve a la puerta para cerrar 🪧');
+    else this.ui.showHint(null);
   }
 
   showTapMarker(x, y) {
@@ -309,11 +338,14 @@ export default class LibraryScene extends Phaser.Scene {
   }
 
   update() {
-    if (this.ui.isPanelOpen() || this.transitioning) {
+    this.customers.update();
+    if (this.isBusy()) {
       this.player.stop();
+      if (this.ui.isChoiceOpen()) this.setAction(null);
       return;
     }
     this.player.update(this.keys, this.joystick);
     this.updateActionAndHint();
+    this.updateQuestions();
   }
 }

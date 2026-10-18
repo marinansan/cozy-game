@@ -326,3 +326,40 @@
   from { transform: rotate(-12deg); }
   to { transform: rotate(12deg); }
 }
+
+/* Bocadillo por encima del punto (flecha abajo) */
+.bocadillo.arriba {
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
+}
+
+.bocadillo.arriba::after {
+  top: auto;
+  bottom: -9px;
+  border-left: none;
+  border-top: none;
+  border-right: 2px solid var(--tinta-suave);
+  border-bottom: 2px solid var(--tinta-suave);
+}
+
+/* Pregunta con botones (Sí / No) */
+.bocadillo.eleccion {
+  cursor: default;
+  padding-right: 0.8em;
+  min-height: 0;
+  width: auto;
+  white-space: nowrap;
+}
+
+.bocadillo .botones {
+  display: flex;
+  justify-content: center;
+  gap: 0.6em;
+  margin-top: 0.5em;
+}
+
+.boton.secundario {
+  background: var(--papel-oscuro);
+  color: var(--tinta) !important;
+  box-shadow: 0 3px 0 var(--tinta-suave);
+}
