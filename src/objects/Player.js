@@ -5,10 +5,16 @@ const SPEED = 80; // píxeles por segundo
 
 // El personaje del jugador. Por ahora es una figura sencilla de colores;
 // cuando tengamos el sprite, solo habrá que cambiar el dibujo.
+//
+// options (para escenas en perspectiva isométrica, como el barrio):
+// - project(x, y): dónde se dibuja en pantalla un punto del plano
+// - screenToPlane(dx, dy): convierte una dirección de pantalla (flecha, joystick) en dirección del plano
 export default class Player {
-  constructor(scene, x, y) {
+  constructor(scene, x, y, options = {}) {
     this.scene = scene;
     this.path = [];
+    this.project = options.project ?? ((px, py) => ({ x: px, y: py }));
+    this.screenToPlane = options.screenToPlane ?? ((dx, dy) => ({ x: dx, y: dy }));
 
     // Cuerpo invisible a la altura de los pies: es lo que choca con los muebles
     this.body = scene.add.zone(x, y, 10, 6);
@@ -16,7 +22,8 @@ export default class Player {
     this.body.body.setCollideWorldBounds(true);
 
     // Dibujo provisional
-    this.sprite = createFigure(scene, x, y, { cuerpo: 0x6b8f71, pelo: 0x5b3a29 });
+    const start = this.project(x, y);
+    this.sprite = createFigure(scene, start.x, start.y, { cuerpo: 0x6b8f71, pelo: 0x5b3a29 });
   }
 
   walkTo(points) {
@@ -51,12 +58,14 @@ export default class Player {
     if (joystick.isActive()) {
       // Móvil: cuanto más arrastras el dedo, más rápido camina (hasta la velocidad máxima)
       this.path = [];
-      body.setVelocity(joystick.direction.x * SPEED, joystick.direction.y * SPEED);
+      const v = this.screenToPlane(joystick.direction.x * SPEED, joystick.direction.y * SPEED);
+      body.setVelocity(v.x, v.y);
     } else if (keyboard.lengthSq() > 0) {
       // PC: el teclado cancela el paseo por clic
       this.path = [];
-      body.setVelocity(keyboard.x, keyboard.y);
-      body.velocity.normalize().scale(SPEED);
+      keyboard.normalize().scale(SPEED);
+      const v = this.screenToPlane(keyboard.x, keyboard.y);
+      body.setVelocity(v.x, v.y);
     } else if (this.path.length) {
       const target = this.path[0];
       const distance = Phaser.Math.Distance.Between(this.body.x, this.body.y, target.x, target.y);
@@ -70,7 +79,8 @@ export default class Player {
       body.setVelocity(0, 0);
     }
 
-    this.sprite.setPosition(Math.round(this.body.x), Math.round(this.body.y));
-    this.sprite.setDepth(this.body.y); // quien está más abajo se dibuja delante
+    const screen = this.project(this.body.x, this.body.y);
+    this.sprite.setPosition(Math.round(screen.x), Math.round(screen.y));
+    this.sprite.setDepth(screen.y); // quien está más abajo en la pantalla se dibuja delante
   }
 }

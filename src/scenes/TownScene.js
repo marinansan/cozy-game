@@ -16,6 +16,7 @@ import {
 } from '../data/townLayout.js';
 import { PHASES } from '../data/phases.js';
 import { state } from '../systems/GameState.js';
+import { ISO_SIZE, isoCorners, screenToPlane, toIso, toPlane } from '../systems/iso.js';
 import Pathfinder from '../systems/Pathfinder.js';
 import Player from '../objects/Player.js';
 import VirtualJoystick from '../ui/VirtualJoystick.js';
@@ -26,9 +27,11 @@ const PICKUP_REACH = 22; // distancia para recoger un objeto
 const QUESTION_OFFSET = 26;
 const BUBBLE_OFFSET = 6;
 const FOG_DEPTH = 5000; // la niebla se dibuja por encima de todo el barrio
+const FOREST_COLOR = 0x4f6b38; // fuera del barrio solo hay bosque
 
-// El barrio por la tarde: un mapa grande con la cámara siguiendo al personaje.
-// Por ahora todo son bloques de colores provisionales; el arte llegará por piezas.
+// El barrio por la tarde, en perspectiva isométrica (en diagonal).
+// El juego piensa en un plano normal (caminar, chocar, buscar caminos) y solo lo dibuja
+// girado; ver src/systems/iso.js. Por ahora todo son bloques de colores provisionales.
 export default class TownScene extends Phaser.Scene {
   constructor() {
     super('TownScene');
@@ -39,6 +42,7 @@ export default class TownScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, width, height);
     this.obstacles = this.physics.add.staticGroup();
     this.obstacleRects = [];
+    this.buildings = [];
     this.debugGraphics = this.add.graphics().setDepth(9000).setVisible(false);
 
     this.drawGround();
@@ -49,7 +53,7 @@ export default class TownScene extends Phaser.Scene {
     this.createFog();
     this.createClues();
 
-    this.player = new Player(this, TOWN_START.x, TOWN_START.y);
+    this.player = new Player(this, TOWN_START.x, TOWN_START.y, { project: toIso, screenToPlane });
     this.physics.add.collider(this.player.body, this.obstacles);
 
     this.pathfinder = new Pathfinder({
@@ -61,8 +65,8 @@ export default class TownScene extends Phaser.Scene {
     });
 
     // Cámara: sigue al personaje sin salirse del barrio
-    this.cameras.main.setBounds(0, 0, width, height);
-    this.cameras.main.setBackgroundColor(0x4f6b38); // verde bosque en los márgenes de la vista de mapa
+    this.cameras.main.setBounds(0, 0, ISO_SIZE.width, ISO_SIZE.height);
+    this.cameras.main.setBackgroundColor(FOREST_COLOR);
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
     this.mapView = false;
 
@@ -82,10 +86,16 @@ export default class TownScene extends Phaser.Scene {
 
   // ---------- Dibujo del barrio (provisional) ----------
 
+  // Rombo de un rectángulo del plano, como lista de puntos de pantalla
+  diamond(x, y, w, h, raise = 0) {
+    const c = isoCorners(x, y, w, h);
+    return [c.top, c.right, c.bottom, c.left].map((p) => ({ x: p.x, y: p.y - raise }));
+  }
+
   addObstacle(x, y, w, h) {
     this.obstacleRects.push({ x, y, w, h });
     this.obstacles.add(this.add.zone(x + w / 2, y + h / 2, w, h));
-    this.debugGraphics.fillStyle(0xff3366, 0.35).fillRect(x, y, w, h);
+    this.debugGraphics.fillStyle(0xff3366, 0.35).fillPoints(this.diamond(x, y, w, h), true);
   }
 
   // El suelo (hierba, caminos, plaza) se dibuja una sola vez y se guarda como imagen,
@@ -93,14 +103,18 @@ export default class TownScene extends Phaser.Scene {
   drawGround() {
     const { width, height } = TOWN_SIZE;
     const g = this.make.graphics({ add: false });
-    g.fillStyle(COLORS.hierba).fillRect(0, 0, width, height);
+    g.fillStyle(COLORS.hierba).fillPoints(this.diamond(0, 0, width, height), true);
+
+    // Un círculo del plano se ve como una elipse aplastada
+    const blob = (x, y, radius) => {
+      const p = toIso(x, y);
+      g.fillEllipse(p.x, p.y, radius * 2 * Math.SQRT2, radius * Math.SQRT2);
+    };
 
     // Manchas de hierba más oscura para que el suelo no sea plano
     const rng = new Phaser.Math.RandomDataGenerator(['barrio']);
     g.fillStyle(COLORS.hierbaOscura, 0.5);
-    for (let i = 0; i < 260; i++) {
-      g.fillEllipse(rng.between(0, width), rng.between(0, height), rng.between(10, 40), rng.between(6, 18));
-    }
+    for (let i = 0; i < 260; i++) blob(rng.between(0, width), rng.between(0, height), rng.between(6, 18));
 
     // Caminos curvos: un borde algo más oscuro y el camino encima
     for (const [color, extra] of [
@@ -110,21 +124,24 @@ export default class TownScene extends Phaser.Scene {
       g.fillStyle(color);
       for (const points of PATHS) {
         const curve = new Phaser.Curves.Spline(points.map((p) => [p.x, p.y]).flat());
-        for (const p of curve.getSpacedPoints(Math.ceil(curve.getLength() / 4))) {
-          g.fillCircle(p.x, p.y, PATH_WIDTH / 2 + extra);
-        }
+        for (const p of curve.getSpacedPoints(Math.ceil(curve.getLength() / 4))) blob(p.x, p.y, PATH_WIDTH / 2 + extra);
       }
     }
 
     // Plaza con fuente
-    g.fillStyle(COLORS.bordePlaza).fillCircle(PLAZA.x, PLAZA.y, PLAZA.radio + 5);
-    g.fillStyle(COLORS.plaza).fillCircle(PLAZA.x, PLAZA.y, PLAZA.radio);
-    g.fillStyle(COLORS.bordePlaza).fillCircle(PLAZA.x, PLAZA.y, PLAZA.fuente + 5);
-    g.fillStyle(COLORS.agua).fillCircle(PLAZA.x, PLAZA.y, PLAZA.fuente);
-    g.fillStyle(0xffffff, 0.6).fillCircle(PLAZA.x, PLAZA.y - 4, 5);
+    g.fillStyle(COLORS.bordePlaza);
+    blob(PLAZA.x, PLAZA.y, PLAZA.radio + 5);
+    g.fillStyle(COLORS.plaza);
+    blob(PLAZA.x, PLAZA.y, PLAZA.radio);
+    g.fillStyle(COLORS.bordePlaza);
+    blob(PLAZA.x, PLAZA.y, PLAZA.fuente + 5);
+    g.fillStyle(COLORS.agua);
+    blob(PLAZA.x, PLAZA.y, PLAZA.fuente);
+    g.fillStyle(0xffffff, 0.6);
+    blob(PLAZA.x - 3, PLAZA.y - 3, 4);
 
     if (this.textures.exists('townGround')) this.textures.remove('townGround');
-    g.generateTexture('townGround', width, height);
+    g.generateTexture('townGround', ISO_SIZE.width, ISO_SIZE.height);
     g.destroy();
     this.add.image(0, 0, 'townGround').setOrigin(0).setDepth(-10);
 
@@ -132,36 +149,64 @@ export default class TownScene extends Phaser.Scene {
     this.addObstacle(PLAZA.x - f, PLAZA.y - f, f * 2, f * 2);
   }
 
+  // Un edificio es una caja: dos fachadas visibles (izquierda y derecha) y el tejado encima
   createBuildings() {
+    const shade = (color, amount) => Phaser.Display.Color.ValueToColor(color).darken(amount).color;
+    const up = (p, dy) => ({ x: p.x, y: p.y - dy });
+
     for (const b of BUILDINGS) {
-      const g = this.add.graphics().setDepth(b.y + b.h);
-      // Pared (la fachada) y tejado por encima
-      g.fillStyle(b.pared).fillRect(b.x, b.y, b.w, b.h);
-      g.fillStyle(b.techo).fillRect(b.x - 6, b.y - b.tejado, b.w + 12, b.tejado + 4);
-      g.fillStyle(0x000000, 0.15).fillRect(b.x - 6, b.y, b.w + 12, 4);
-      // Puerta y ventanas sencillas
-      if (b.id !== 'bloque') {
-        g.fillStyle(0x5b3a29).fillRect(b.x + b.w / 2 - 9, b.y + b.h - 26, 18, 26);
-        g.fillStyle(0xf2d38a).fillRect(b.x + 12, b.y + 14, 22, 16).fillRect(b.x + b.w - 34, b.y + 14, 22, 16);
-      } else {
-        g.fillStyle(0x6f6f6f);
-        for (let wx = b.x + 12; wx < b.x + b.w - 20; wx += 30) {
-          for (let wy = b.y - b.tejado + 12; wy < b.y + b.h - 20; wy += 28) g.fillRect(wx, wy, 16, 14);
+      const wallHeight = b.id === 'bloque' ? 90 : 32;
+      const c = isoCorners(b.x, b.y, b.w, b.h);
+      const g = this.add.graphics();
+
+      // Fachada izquierda (la de la puerta) y fachada derecha, algo más oscura
+      g.fillStyle(b.pared).fillPoints([c.left, c.bottom, up(c.bottom, wallHeight), up(c.left, wallHeight)], true);
+      g.fillStyle(shade(b.pared, 15)).fillPoints([c.bottom, c.right, up(c.right, wallHeight), up(c.bottom, wallHeight)], true);
+      // Tejado: el rombo de arriba, un poco más grande que la planta, y una cumbrera
+      g.fillStyle(b.techo).fillPoints(this.diamond(b.x - 6, b.y - 6, b.w + 12, b.h + 12, wallHeight), true);
+      const ridgeRaise = wallHeight + b.tejado * 0.5;
+      g.fillStyle(shade(b.techo, 12)).fillPoints(this.diamond(b.x + b.w * 0.25, b.y + b.h * 0.25, b.w * 0.5, b.h * 0.5, ridgeRaise), true);
+
+      // Puerta y ventanas en la fachada izquierda (la que da al camino)
+      const onLeftFace = (from, to, bottom, top, color) => {
+        const p1 = toIso(b.x + from, b.y + b.h);
+        const p2 = toIso(b.x + to, b.y + b.h);
+        g.fillStyle(color).fillPoints([up(p1, bottom), up(p2, bottom), up(p2, top), up(p1, top)], true);
+      };
+      if (b.id === 'bloque') {
+        for (let wx = 10; wx < b.w - 20; wx += 30) {
+          for (let wy = 14; wy < wallHeight - 10; wy += 22) onLeftFace(wx, wx + 16, wy, wy + 12, 0x6f6f6f);
         }
+      } else {
+        onLeftFace(b.w / 2 - 9, b.w / 2 + 9, 0, 22, 0x5b3a29);
+        onLeftFace(10, 32, 10, 22, 0xf2d38a);
+        onLeftFace(b.w - 32, b.w - 10, 10, 22, 0xf2d38a);
       }
-      this.addLabel(b.x + b.w / 2, b.y - b.tejado - 8, b.nombre);
+
+      const labelAt = toIso(b.x + b.w / 2, b.y + b.h / 2);
+      this.addLabel(labelAt.x, labelAt.y - ridgeRaise - 8, b.nombre);
       this.addObstacle(b.x, b.y, b.w, b.h);
+      this.buildings.push({ ...b, graphics: g });
     }
   }
 
   createLot() {
-    const g = this.add.graphics().setDepth(LOT.y);
-    g.fillStyle(COLORS.solar, 0.6).fillRect(LOT.x, LOT.y, LOT.w, LOT.h);
-    g.lineStyle(3, COLORS.valla).strokeRect(LOT.x, LOT.y, LOT.w, LOT.h);
-    // Abertura en la valla de arriba, en el centro
+    const g = this.add.graphics().setDepth(toIso(LOT.x, LOT.y).y);
+    g.fillStyle(COLORS.solar, 0.6).fillPoints(this.diamond(LOT.x, LOT.y, LOT.w, LOT.h), true);
+    // Valla en los cuatro lados, con una abertura en el lado que da a la plaza
     const gap = { from: LOT.x + LOT.w / 2 - LOT.abertura / 2, to: LOT.x + LOT.w / 2 + LOT.abertura / 2 };
-    g.fillStyle(COLORS.solar, 1).fillRect(gap.from, LOT.y - 2, LOT.abertura, 4);
-    this.addLabel(LOT.x + LOT.w / 2, LOT.y + LOT.h / 2, 'Solar vacío');
+    const fence = (x1, y1, x2, y2) => {
+      const a = toIso(x1, y1);
+      const b = toIso(x2, y2);
+      g.lineStyle(3, COLORS.valla).lineBetween(a.x, a.y - 4, b.x, b.y - 4);
+    };
+    fence(LOT.x, LOT.y, gap.from, LOT.y);
+    fence(gap.to, LOT.y, LOT.x + LOT.w, LOT.y);
+    fence(LOT.x + LOT.w, LOT.y, LOT.x + LOT.w, LOT.y + LOT.h);
+    fence(LOT.x, LOT.y, LOT.x, LOT.y + LOT.h);
+    fence(LOT.x, LOT.y + LOT.h, LOT.x + LOT.w, LOT.y + LOT.h);
+    const center = toIso(LOT.x + LOT.w / 2, LOT.y + LOT.h / 2);
+    this.addLabel(center.x, center.y, 'Solar vacío');
     const t = 4;
     this.addObstacle(LOT.x, LOT.y - t / 2, gap.from - LOT.x, t);
     this.addObstacle(gap.to, LOT.y - t / 2, LOT.x + LOT.w - gap.to, t);
@@ -172,15 +217,17 @@ export default class TownScene extends Phaser.Scene {
 
   createProps() {
     for (const p of PROPS) {
-      const g = this.add.graphics().setDepth(p.y + p.h);
+      const base = toIso(p.x + p.w / 2, p.y + p.h / 2);
+      const g = this.add.graphics().setDepth(base.y);
       if (p.tipo === 'banco') {
-        g.fillStyle(0x8a5a3b).fillRect(p.x, p.y - 6, p.w, 6).fillRect(p.x, p.y, p.w, p.h);
+        g.fillStyle(0x6b4a2f).fillRect(base.x - 2, base.y - 6, 4, 6);
+        g.fillStyle(0x8a5a3b).fillPoints(this.diamond(p.x, p.y, p.w, p.h, 6), true);
       } else if (p.tipo === 'linterna') {
-        g.fillStyle(0x9a9a8a).fillRect(p.x, p.y - 14, p.w, p.h + 14);
-        g.fillStyle(0xf2d38a).fillRect(p.x + 3, p.y - 10, p.w - 6, 5);
+        g.fillStyle(0x9a9a8a).fillRect(base.x - 5, base.y - 22, 10, 22);
+        g.fillStyle(0xf2d38a).fillRect(base.x - 3, base.y - 18, 6, 5);
       } else if (p.tipo === 'farola') {
-        g.fillStyle(0x3d3d3d).fillRect(p.x, p.y - 34, p.w, p.h + 34);
-        g.fillStyle(0xf2d38a).fillCircle(p.x + p.w / 2, p.y - 36, 5);
+        g.fillStyle(0x3d3d3d).fillRect(base.x - 2, base.y - 36, 4, 36);
+        g.fillStyle(0xf2d38a).fillCircle(base.x, base.y - 38, 5);
       }
       this.addObstacle(p.x, p.y, p.w, p.h);
     }
@@ -197,7 +244,8 @@ export default class TownScene extends Phaser.Scene {
       g.generateTexture('townTree', 48, 60);
       g.destroy();
     }
-    this.add.image(x, y, 'townTree').setOrigin(0.5, 1).setScale(size).setDepth(y);
+    const p = toIso(x, y);
+    this.add.image(p.x, p.y, 'townTree').setOrigin(0.5, 1).setScale(size).setDepth(p.y);
     this.addObstacle(x - 4, y - 4, 8, 6);
   }
 
@@ -222,17 +270,17 @@ export default class TownScene extends Phaser.Scene {
 
   // Niebla: nubes blancas que se mueven despacio y bloquean el paso
   createFog() {
-    const glow = this.makeGlowTexture();
+    const cloud = this.makeCloudTexture();
     this.fogParts = [];
     for (const zone of FOG_ZONES) {
       // Base algo más pequeña que la zona: los bordes los forman las nubes, no una línea recta
       const inset = 40;
-      const base = this.add
-        .rectangle(zone.x + inset, zone.y + inset, zone.w - inset * 2, zone.h - inset * 2, 0xf4f1ec, 0.7)
-        .setOrigin(0)
-        .setDepth(FOG_DEPTH);
+      const base = this.add.graphics().setDepth(FOG_DEPTH);
+      base
+        .fillStyle(0xf4f1ec, 0.7)
+        .fillPoints(this.diamond(zone.x + inset, zone.y + inset, zone.w - inset * 2, zone.h - inset * 2), true);
       this.fogParts.push(base);
-      // Nubes en el borde para que no sea un rectángulo recto
+
       const rng = new Phaser.Math.RandomDataGenerator([zone.id]);
       const count = Math.ceil((zone.w + zone.h) / 10);
       for (let i = 0; i < count; i++) {
@@ -249,28 +297,29 @@ export default class TownScene extends Phaser.Scene {
             ? zone.y + depth
             : zone.y + zone.h - depth
           : zone.y + rng.between(0, zone.h);
-        const cloud = this.add
-          .image(x, y, glow)
-          .setDisplaySize(rng.between(120, 200), rng.between(100, 160))
+        const p = toIso(x, y);
+        const puff = this.add
+          .image(p.x, p.y, cloud)
+          .setDisplaySize(rng.between(170, 260), rng.between(90, 140))
           .setDepth(FOG_DEPTH)
           .setAlpha(0.9);
         this.tweens.add({
-          targets: cloud,
-          x: x + rng.between(-14, 14),
-          y: y + rng.between(-8, 8),
+          targets: puff,
+          x: p.x + rng.between(-14, 14),
+          y: p.y + rng.between(-8, 8),
           duration: rng.between(3000, 6000),
           yoyo: true,
           repeat: -1,
           ease: 'Sine.easeInOut',
         });
-        this.fogParts.push(cloud);
+        this.fogParts.push(puff);
       }
       // Se bloquea un poco antes del borde visible
       this.addObstacle(zone.x - 10, zone.y - 10, zone.w + 20, zone.h + 20);
     }
   }
 
-  makeGlowTexture() {
+  makeCloudTexture() {
     if (!this.textures.exists('fogCloud')) {
       const tex = this.textures.createCanvas('fogCloud', 64, 64);
       const ctx = tex.getContext();
@@ -288,12 +337,13 @@ export default class TownScene extends Phaser.Scene {
     this.clues = [];
     for (const clue of CLUES) {
       if (state.inventory.includes(clue.id)) continue;
+      const p = toIso(clue.x, clue.y);
       // Farolillo provisional con un brillo que late para llamar la atención
-      const shine = this.add.circle(clue.x, clue.y - 6, 10, 0xffe9a8, 0.5).setDepth(clue.y - 1);
+      const shine = this.add.circle(p.x, p.y - 6, 10, 0xffe9a8, 0.5).setDepth(p.y - 1);
       this.tweens.add({ targets: shine, scale: 1.5, alpha: 0.1, duration: 900, yoyo: true, repeat: -1 });
-      const body = this.add.graphics().setDepth(clue.y);
-      body.fillStyle(0xe8dcc0).fillRect(clue.x - 4, clue.y - 11, 8, 10);
-      body.fillStyle(0x8a5a3b).fillRect(clue.x - 5, clue.y - 12, 10, 2).fillRect(clue.x - 5, clue.y - 1, 10, 2);
+      const body = this.add.graphics().setDepth(p.y);
+      body.fillStyle(0xe8dcc0).fillRect(p.x - 4, p.y - 11, 8, 10);
+      body.fillStyle(0x8a5a3b).fillRect(p.x - 5, p.y - 12, 10, 2).fillRect(p.x - 5, p.y - 1, 10, 2);
       this.clues.push({ ...clue, parts: [shine, body] });
     }
   }
@@ -316,10 +366,20 @@ export default class TownScene extends Phaser.Scene {
       phase.fuerza * 100,
     );
     this.add
-      .rectangle(0, 0, TOWN_SIZE.width, TOWN_SIZE.height, Phaser.Display.Color.GetColor(color.r, color.g, color.b))
+      .rectangle(0, 0, ISO_SIZE.width, ISO_SIZE.height, Phaser.Display.Color.GetColor(color.r, color.g, color.b))
       .setOrigin(0)
       .setDepth(8500)
       .setBlendMode(Phaser.BlendModes.MULTIPLY);
+  }
+
+  // En perspectiva isométrica, un edificio tapa al personaje solo si este está detrás.
+  // Delante = al sur o al este de su planta (los lados de las fachadas visibles).
+  sortBuildings() {
+    const depth = this.player.sprite.depth;
+    for (const b of this.buildings) {
+      const inFront = this.player.x >= b.x + b.w || this.player.y >= b.y + b.h;
+      b.graphics.setDepth(inFront ? depth - 1 : depth + 1);
+    }
   }
 
   // ---------- Controles ----------
@@ -330,7 +390,8 @@ export default class TownScene extends Phaser.Scene {
     // PC: clic para caminar hasta ese punto del barrio
     this.input.on('pointerdown', (pointer) => {
       if (pointer.wasTouch || this.isBusy()) return;
-      const path = this.pathfinder.findPath(this.player.x, this.player.y, pointer.worldX, pointer.worldY);
+      const target = toPlane(pointer.worldX, pointer.worldY);
+      const path = this.pathfinder.findPath(this.player.x, this.player.y, target.x, target.y);
       this.player.walkTo(path);
     });
 
@@ -373,29 +434,31 @@ export default class TownScene extends Phaser.Scene {
       this.ui.hideBubble();
       camera.stopFollow();
       camera.removeBounds(); // para poder centrar el barrio entero en la pantalla
-      const zoom = Math.min(this.scale.width / TOWN_SIZE.width, this.scale.height / TOWN_SIZE.height);
-      camera.pan(TOWN_SIZE.width / 2, TOWN_SIZE.height / 2, 500, 'Sine.easeInOut');
+      const zoom = Math.min(this.scale.width / ISO_SIZE.width, this.scale.height / ISO_SIZE.height);
+      camera.pan(ISO_SIZE.width / 2, ISO_SIZE.height / 2, 500, 'Sine.easeInOut');
       camera.zoomTo(zoom, 500, 'Sine.easeInOut');
       this.ui.showMapButton('✖ Volver', () => this.toggleMap());
       this.setAction(null);
       this.ui.showHint('Así se ve el barrio de lejos. La niebla oculta lo que aún no recuerdas.');
     } else {
+      const target = this.player.sprite;
       camera.zoomTo(1, 500, 'Sine.easeInOut');
-      camera.pan(this.player.x, this.player.y, 500, 'Sine.easeInOut', false, (_cam, progress) => {
+      camera.pan(target.x, target.y, 500, 'Sine.easeInOut', false, (_cam, progress) => {
         if (progress === 1) {
-          camera.setBounds(0, 0, TOWN_SIZE.width, TOWN_SIZE.height);
-          camera.startFollow(this.player.sprite, true, 0.12, 0.12);
+          camera.setBounds(0, 0, ISO_SIZE.width, ISO_SIZE.height);
+          camera.startFollow(target, true, 0.12, 0.12);
         }
       });
       this.ui.showMapButton('🗺️ Mapa', () => this.toggleMap());
     }
   }
 
-  // Convierte una posición del barrio en posición de la pantalla (para bocadillos)
+  // Convierte un punto del plano en posición de la pantalla (para bocadillos)
   toScreen(x, y) {
+    const p = toIso(x, y);
     const view = this.cameras.main.worldView;
     const zoom = this.cameras.main.zoom;
-    return { x: (x - view.x) * zoom, y: (y - view.y) * zoom };
+    return { x: (p.x - view.x) * zoom, y: (p.y - view.y) * zoom };
   }
 
   setAction(label, callback) {
@@ -416,8 +479,8 @@ export default class TownScene extends Phaser.Scene {
     state.inventory.push(clue.id);
     for (const part of clue.parts) part.destroy();
     Phaser.Utils.Array.Remove(this.clues, clue);
-    const pos = this.toScreen(this.player.x, this.player.y + BUBBLE_OFFSET);
-    this.ui.showBubble(pos.x, pos.y, `🏮 ${clue.nombre}`, clue.texto);
+    const pos = this.toScreen(this.player.x, this.player.y);
+    this.ui.showBubble(pos.x, pos.y + BUBBLE_OFFSET, `🏮 ${clue.nombre}`, clue.texto);
   }
 
   // Al pararte en la puerta de la librería, pregunta qué quieres hacer
@@ -433,8 +496,8 @@ export default class TownScene extends Phaser.Scene {
     this.askedAtDoor = true;
     this.player.stop();
     this.setAction(null);
-    const pos = this.toScreen(this.player.x, this.player.y - QUESTION_OFFSET);
-    this.ui.showChoice(pos.x, pos.y, '¿Volver a la librería?', [
+    const pos = this.toScreen(this.player.x, this.player.y);
+    this.ui.showChoice(pos.x, pos.y - QUESTION_OFFSET, '¿Volver a la librería?', [
       { label: '🏠 Entrar', principal: true, onClick: () => this.goToLibrary('tarde') },
       { label: '🌙 Abrir de noche', principal: true, onClick: () => this.goToLibrary('noche') },
       { label: 'No', onClick: () => {} },
@@ -460,6 +523,7 @@ export default class TownScene extends Phaser.Scene {
       return;
     }
     this.player.update(this.keys, this.joystick);
+    this.sortBuildings();
     // Si echas a andar, el mensaje del objeto encontrado se cierra solo
     if (this.ui.isBubbleOpen() && this.player.isMoving()) this.ui.hideBubble();
 

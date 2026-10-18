@@ -32,7 +32,9 @@ Juego *cozy* de gestión, exploración y construcción. Heredas la librería-caf
 
 ## 4. Perspectiva y arte
 
-- **Vista cenital en 3/4** sobre cuadrícula recta (como Stardew Valley o Cozy Grove).
+- **Exteriores (el barrio): perspectiva isométrica 2:1**, en diagonal como un diorama (referencia: reinterpretaciones isométricas de Stardew Valley). El juego calcula en un plano normal y solo lo dibuja en diagonal (`src/systems/iso.js`).
+- **Interiores (librería y otros lugares): vista cenital en 3/4**, como la librería actual.
+- **De lejos:** botón de mapa que muestra el barrio entero (plaza central, caminos curvos, edificios únicos, bosque y niebla en los bordes).
 - **Pixel art "suave":** contornos suaves, paletas armónicas poco saturadas, luz ambiental. Ver `gat/narrative/world.md` §7.
 - **Arte inicial:** imágenes generadas con ChatGPT y limpiadas con `tools/clean_art.py` (cuadrícula real de píxeles y colores limitados). Personaje provisional con formas.
 - **Arte definitivo:** se rediseñará la librería y todo lo demás más adelante.
