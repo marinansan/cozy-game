@@ -8,13 +8,20 @@ const config = {
   parent: 'game',
   width: 640,
   height: 360,
-  backgroundColor: '#f4e9d8',
+  backgroundColor: '#1e1b18',
   pixelArt: true,
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
+  physics: {
+    default: 'arcade',
+    arcade: { debug: false },
+  },
   scene: [LibraryScene],
 };
 
-new Phaser.Game(config);
+const game = new Phaser.Game(config);
+
+// Acceso para pruebas desde la consola del navegador
+window.__game = game;

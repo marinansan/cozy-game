@@ -17,13 +17,13 @@ Comprobar que el corazón del juego funciona y resulta relajante: **un día comp
 
 ## Pasos
 
-### Paso 0. Preparar el proyecto
+### Paso 0. Preparar el proyecto ✔️ (hecho)
 - Crear el proyecto Phaser 3 con una herramienta de desarrollo web (Vite).
 - Una pantalla horizontal que se adapta al tamaño de PC y móvil.
 - Publicar automáticamente en una web (por ejemplo, GitHub Pages) para **probar en el móvil con un enlace**.
 - ✅ *Se ve:* una pantalla de color con el texto "Hola, librería".
 
-### Paso 1. Caminar por la librería
+### Paso 1. Caminar por la librería ✔️ (hecho, con fondo de ChatGPT)
 - Un interior sencillo sobre cuadrícula: paredes, mostrador, estantería y puerta.
 - El personaje camina al tocar o hacer clic en el suelo, y con el teclado en PC. Choca con los muebles.
 - ✅ *Se ve:* un cuadrado que pasea por la librería.

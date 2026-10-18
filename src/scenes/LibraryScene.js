@@ -1,41 +1,70 @@
 import Phaser from 'phaser';
+import { LIBRARY_BACKGROUND, LIBRARY_OBSTACLES, PLAYER_START } from '../data/libraryLayout.js';
+import Pathfinder from '../systems/Pathfinder.js';
+import Player from '../objects/Player.js';
 
-// Escena principal: por ahora solo un saludo para comprobar que todo funciona.
+// Interior de la librería-cafetería: el personaje camina por ella.
 export default class LibraryScene extends Phaser.Scene {
   constructor() {
     super('LibraryScene');
   }
 
+  preload() {
+    this.load.image(LIBRARY_BACKGROUND, 'assets/libreria.png');
+  }
+
   create() {
     const { width, height } = this.scale;
+    this.add.image(0, 0, LIBRARY_BACKGROUND).setOrigin(0);
 
-    this.add
-      .text(width / 2, height / 2 - 10, 'Hola, librería', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '32px',
-        color: '#5b3a29',
-      })
-      .setOrigin(0.5);
+    // Muebles y paredes: rectángulos invisibles que bloquean el paso
+    this.obstacles = this.physics.add.staticGroup();
+    this.debugGraphics = this.add.graphics().setDepth(10).setVisible(false);
+    for (const o of LIBRARY_OBSTACLES) {
+      const zone = this.add.zone(o.x + o.w / 2, o.y + o.h / 2, o.w, o.h);
+      this.obstacles.add(zone);
+      this.debugGraphics.fillStyle(0xff3366, 0.35).fillRect(o.x, o.y, o.w, o.h);
+    }
 
-    const hint = this.add
-      .text(width / 2, height / 2 + 30, 'Toca la pantalla', {
-        fontFamily: 'sans-serif',
-        fontSize: '14px',
-        color: '#8a6a55',
-      })
-      .setOrigin(0.5);
+    this.player = new Player(this, PLAYER_START.x, PLAYER_START.y);
+    this.physics.add.collider(this.player.body, this.obstacles);
 
-    // Comprobación de que el toque (móvil) y el clic (PC) funcionan
-    this.input.on('pointerdown', (pointer) => {
-      hint.setText('¡Hola! 👋');
-      const dot = this.add.circle(pointer.x, pointer.y, 6, 0xe0a458);
-      this.tweens.add({
-        targets: dot,
-        alpha: 0,
-        scale: 3,
-        duration: 600,
-        onComplete: () => dot.destroy(),
-      });
+    this.pathfinder = new Pathfinder({
+      width,
+      height,
+      cellSize: 4,
+      obstacles: LIBRARY_OBSTACLES,
+      margin: { x: 5, top: 3, bottom: 3 },
     });
+
+    // Tocar (móvil) o hacer clic (PC) para caminar hasta ese punto
+    this.input.on('pointerdown', (pointer) => {
+      const path = this.pathfinder.findPath(this.player.body.x, this.player.body.y, pointer.x, pointer.y);
+      this.player.walkTo(path);
+      this.showTapMarker(pointer.x, pointer.y);
+    });
+
+    this.keys = this.input.keyboard.addKeys('up,down,left,right,w,a,s,d');
+
+    // Modo depuración: muestra los obstáculos (Mayús + D o ?debug en la dirección)
+    this.debugGraphics.setVisible(new URLSearchParams(window.location.search).has('debug'));
+    this.input.keyboard.on('keydown-D', (event) => {
+      if (event.shiftKey) this.debugGraphics.setVisible(!this.debugGraphics.visible);
+    });
+  }
+
+  showTapMarker(x, y) {
+    const marker = this.add.circle(x, y, 3, 0xf4e9d8, 0.9).setDepth(5);
+    this.tweens.add({
+      targets: marker,
+      alpha: 0,
+      scale: 2.5,
+      duration: 400,
+      onComplete: () => marker.destroy(),
+    });
+  }
+
+  update() {
+    this.player.update(this.keys);
   }
 }
