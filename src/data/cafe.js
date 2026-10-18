@@ -118,6 +118,15 @@ export const CUSTOMERS = [
   },
 ];
 
-// Cuántos clientes vienen cada mañana y cuántos puede haber a la vez dentro
-export const CUSTOMERS_PER_DAY = 6;
-export const MAX_CUSTOMERS_INSIDE = 4;
+// Visitantes de ambiente: no piden nada, solo dan vida a la librería.
+// Entran, curiosean en las estanterías, se sientan un rato y se van.
+// actividad: lo que hacen sentados ('leer' o 'tomar'); se ve con iconos sobre la cabeza
+export const VISITORS = [
+  { nombre: 'Estudiante', colores: { cuerpo: 0x8fa36b, pelo: 0x2b2018 }, actividad: 'leer' },
+  { nombre: 'Señora con sombrero', colores: { cuerpo: 0xb07a5a, pelo: 0x6b4a3a }, actividad: 'leer' },
+  { nombre: 'Chico con auriculares', colores: { cuerpo: 0x5a6b8f, pelo: 0x1f1a17 }, actividad: 'tomar' },
+];
+
+// Cuántos visitantes de ambiente vienen cada mañana y cuántas personas puede haber dentro a la vez
+export const VISITORS_PER_DAY = 3;
+export const MAX_PEOPLE_INSIDE = 6;

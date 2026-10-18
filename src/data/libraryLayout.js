@@ -27,12 +27,8 @@ export const LAMPS = [
   { x: 605, y: 275, radio: 26 }, // farolillo de la pared derecha
 ];
 
-// Cola delante del mostrador: el primero es quien pide
-export const QUEUE_SPOTS = [
-  { x: 405, y: 174 },
-  { x: 405, y: 194 },
-  { x: 405, y: 214 },
-];
+// Sitio delante del mostrador donde se pide (solo una persona cada vez, sin colas)
+export const COUNTER_SPOT = { x: 405, y: 174 };
 
 // Sitios delante de las estanterías donde los clientes miran libros
 export const BROWSE_SPOTS = [

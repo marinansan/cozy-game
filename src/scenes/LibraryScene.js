@@ -216,13 +216,13 @@ export default class LibraryScene extends Phaser.Scene {
     let question;
     let onYes;
     if (this.phase === 'manana') {
-      if (!this.customers.isEmpty()) return; // no se cierra con clientes dentro
+      if (!this.customers.canClose()) return; // no se cierra mientras alguien espera a que le atiendas
       question = this.customers.moreToday()
         ? 'Aún pueden venir clientes… ¿Cerrar la tienda igualmente?'
         : '¿Quieres cerrar la tienda por hoy?';
       onYes = () => {
         this.customers.stopDay();
-        this.goToPhase('tarde');
+        this.goToPhase('tarde', () => this.customers.clearAll());
       };
     } else if (this.phase === 'tarde') {
       question = '¿Abrir la librería esta noche?';
@@ -322,7 +322,7 @@ export default class LibraryScene extends Phaser.Scene {
     if (this.ui.isBubbleOpen() || interaction) this.ui.showHint(null);
     else if (pending.counter && !this.isBehindCounter()) this.ui.showHint('Hay alguien esperando en el mostrador (entra por la derecha)');
     else if (pending.shelves) this.ui.showHint('Alguien te llama ❗ en las estanterías');
-    else if (!this.customers.moreToday() && this.customers.isEmpty()) this.ui.showHint('Ya no vienen más clientes. Ve a la puerta para cerrar 🪧');
+    else if (!this.customers.moreToday() && this.customers.canClose()) this.ui.showHint('Ya no vienen más clientes. Cuando quieras, ve a la puerta para cerrar 🪧');
     else this.ui.showHint(null);
   }
 

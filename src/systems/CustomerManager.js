@@ -1,185 +1,256 @@
 import Phaser from 'phaser';
-import { BROWSE_SPOTS, DOOR, QUEUE_SPOTS, SEATS } from '../data/libraryLayout.js';
-import { CUSTOMERS, CUSTOMERS_PER_DAY, MAX_CUSTOMERS_INSIDE } from '../data/cafe.js';
+import { BROWSE_SPOTS, COUNTER_SPOT, DOOR, SEATS } from '../data/libraryLayout.js';
+import { CUSTOMERS, MAX_PEOPLE_INSIDE, VISITORS, VISITORS_PER_DAY } from '../data/cafe.js';
 import Customer from '../objects/Customer.js';
 
-const SPAWN_EVERY = { min: 5000, max: 9000 }; // milisegundos entre llegadas
-const BROWSE_TIME = { min: 3500, max: 7000 }; // tiempo mirando libros antes de llamarte
-const SEATED_TIME = { min: 20000, max: 35000 }; // tiempo sentado tomando algo
+// Ritmo de llegada: pausado pero no lento
+const ARRIVAL_EVERY = { min: 6000, max: 10000 }; // milisegundos entre llegadas
+const COUNTER_REST = { min: 4000, max: 8000 }; // pausa tras atender antes de que llegue otra persona al mostrador
+const BROWSE_TIME = { min: 4000, max: 8000 }; // tiempo mirando una estantería
+const SEATED_TIME = { min: 35000, max: 60000 }; // tiempo sentado leyendo o tomando algo
+const EMOTE_EVERY = { min: 4000, max: 9000 }; // cada cuánto aparece un icono sobre quien está sentado
 
 const between = ({ min, max }) => Phaser.Math.Between(min, max);
 
-// Estados de un cliente:
-// entering → (cola) inLine → wantsTalk (!) → talking → waitingServe → serving → reacting
-//          → (estantería) browsing → wantsTalk (!) → …
-// después de reaccionar: seated (si se queda) → leaving
+// Gestiona a todas las personas de la librería durante la mañana.
+//
+// Clientes (piden algo):
+//   mostrador:  entering → wantsTalk (!) → talking → waitingServe → serving → reacting → (seated) → leaving
+//   estantería: entering → browsing → wantsTalk (!) → …igual que arriba
+// Visitantes (solo dan ambiente): entering → browsing → (otra estantería) → seated → leaving
+//
+// En el mostrador solo hay una persona cada vez: nunca se forma cola.
 export default class CustomerManager {
   constructor(scene, pathfinder) {
     this.scene = scene;
     this.pathfinder = pathfinder;
-    this.customers = [];
-    this.queue = []; // clientes en la cola del mostrador, el primero es quien pide
+    this.people = [];
+    this.atCounter = null; // la persona que va al mostrador o está en él
+    this.counterFreeAt = 0; // momento a partir del cual puede venir alguien nuevo al mostrador
     this.browseTaken = new Set(); // índices de BROWSE_SPOTS ocupados
     this.seatTaken = new Set(); // índices de SEATS ocupados
-    this.todayList = [];
-    this.spawnTimer = null;
+    this.todayCustomers = [];
+    this.todayVisitors = [];
+    this.arrivalTimer = null;
   }
 
   // ---------- Día ----------
 
   startDay() {
-    // La lista del día: los clientes en orden aleatorio
-    this.todayList = Phaser.Utils.Array.Shuffle([...CUSTOMERS]).slice(0, CUSTOMERS_PER_DAY);
-    this.scheduleSpawn(1500);
+    this.todayCustomers = Phaser.Utils.Array.Shuffle([...CUSTOMERS]);
+    this.todayVisitors = Phaser.Utils.Array.Shuffle([...VISITORS]).slice(0, VISITORS_PER_DAY);
+    this.counterFreeAt = 0;
+    this.scheduleArrival(1500);
   }
 
   stopDay() {
-    this.spawnTimer?.remove();
-    this.spawnTimer = null;
-    this.todayList = [];
+    this.arrivalTimer?.remove();
+    this.arrivalTimer = null;
+    this.todayCustomers = [];
+    this.todayVisitors = [];
   }
 
   isEmpty() {
-    return this.customers.length === 0;
+    return this.people.length === 0;
+  }
+
+  // Se puede cerrar si nadie está esperando a que le atiendas
+  // (quien está sentado o curioseando se marcha al cerrar)
+  canClose() {
+    const busy = ['wantsTalk', 'talking', 'waitingServe', 'serving', 'reacting'];
+    return !this.people.some((p) => busy.includes(p.state));
+  }
+
+  // Al cerrar la tienda, todo el mundo se ha ido (ocurre durante el fundido)
+  clearAll() {
+    for (const person of this.people) person.destroy();
+    this.people = [];
+    this.atCounter = null;
+    this.browseTaken.clear();
+    this.seatTaken.clear();
   }
 
   moreToday() {
-    return this.todayList.length > 0;
+    return this.todayCustomers.length > 0 || this.todayVisitors.length > 0;
   }
 
-  scheduleSpawn(delay = between(SPAWN_EVERY)) {
-    this.spawnTimer?.remove();
-    this.spawnTimer = this.scene.time.delayedCall(delay, () => this.trySpawn());
+  scheduleArrival(delay = between(ARRIVAL_EVERY)) {
+    this.arrivalTimer?.remove();
+    this.arrivalTimer = this.scene.time.delayedCall(delay, () => this.tryArrival());
   }
 
-  trySpawn() {
+  // Decide quién entra ahora (si hay sitio) y programa la siguiente llegada
+  tryArrival() {
     if (!this.moreToday()) return;
-    const index = this.todayList.findIndex((data) => this.hasRoomFor(data));
-    if (this.customers.length < MAX_CUSTOMERS_INSIDE && index >= 0) {
-      const [data] = this.todayList.splice(index, 1);
-      this.spawn(data);
+    if (this.people.length < MAX_PEOPLE_INSIDE) {
+      const next = this.pickNextArrival();
+      if (next) this.arrive(next.data, next.isVisitor);
     }
-    if (this.moreToday()) this.scheduleSpawn();
+    if (this.moreToday()) this.scheduleArrival();
   }
 
-  hasRoomFor(data) {
-    if (data.espera === 'mostrador') return this.queue.length < QUEUE_SPOTS.length;
-    return this.browseTaken.size < BROWSE_SPOTS.length;
+  pickNextArrival() {
+    const counterFree = !this.atCounter && this.scene.time.now >= this.counterFreeAt;
+    const shelfFree = this.browseTaken.size < BROWSE_SPOTS.length;
+
+    // Clientes que pueden entrar ahora mismo
+    const customerIndex = this.todayCustomers.findIndex((data) =>
+      data.espera === 'mostrador' ? counterFree : shelfFree,
+    );
+    // De vez en cuando entra un visitante de ambiente en lugar de un cliente
+    const visitorReady = this.todayVisitors.length > 0 && shelfFree;
+    const preferVisitor = visitorReady && (customerIndex < 0 || Math.random() < 0.3);
+
+    if (preferVisitor) return { data: this.todayVisitors.shift(), isVisitor: true };
+    if (customerIndex >= 0) return { data: this.todayCustomers.splice(customerIndex, 1)[0], isVisitor: false };
+    return null;
   }
 
-  spawn(data) {
-    const customer = new Customer(this.scene, data, DOOR.x, DOOR.y);
-    this.customers.push(customer);
-    if (data.espera === 'mostrador') {
-      this.queue.push(customer);
-      this.walkToQueueSpot(customer);
+  arrive(data, isVisitor) {
+    const person = new Customer(this.scene, data, DOOR.x, DOOR.y);
+    person.isVisitor = isVisitor;
+    this.people.push(person);
+
+    if (!isVisitor && data.espera === 'mostrador') {
+      this.atCounter = person;
+      this.walkTo(person, COUNTER_SPOT, () => this.wantsToTalk(person));
     } else {
-      const free = BROWSE_SPOTS.map((_, i) => i).filter((i) => !this.browseTaken.has(i));
-      const spotIndex = Phaser.Utils.Array.GetRandom(free);
-      this.browseTaken.add(spotIndex);
-      customer.browseSpot = spotIndex;
-      this.walkTo(customer, BROWSE_SPOTS[spotIndex], () => {
-        customer.state = 'browsing';
-        this.scene.time.delayedCall(between(BROWSE_TIME), () => this.wantsToTalk(customer));
-      });
+      this.goBrowse(person);
     }
   }
 
-  walkTo(customer, target, onArrive) {
-    const path = this.pathfinder.findPath(customer.x, customer.y, target.x, target.y);
-    customer.walk(path, onArrive);
+  walkTo(person, target, onArrive) {
+    const path = this.pathfinder.findPath(person.x, person.y, target.x, target.y);
+    person.walk(path, onArrive);
   }
 
-  // ---------- Cola del mostrador ----------
+  // ---------- Estanterías ----------
 
-  walkToQueueSpot(customer) {
-    const position = this.queue.indexOf(customer);
-    this.walkTo(customer, QUEUE_SPOTS[position], () => {
-      if (this.queue[0] === customer) this.wantsToTalk(customer);
-      else customer.state = 'inLine';
+  freeBrowseSpot(exceptIndex) {
+    const free = BROWSE_SPOTS.map((_, i) => i).filter((i) => !this.browseTaken.has(i) && i !== exceptIndex);
+    return free.length ? Phaser.Utils.Array.GetRandom(free) : null;
+  }
+
+  releaseBrowseSpot(person) {
+    if (person.browseSpot === undefined) return;
+    this.browseTaken.delete(person.browseSpot);
+    person.browseSpot = undefined;
+  }
+
+  // Va a una estantería libre y mira libros un rato.
+  // Los clientes después te llaman con "!"; los visitantes pasan a otra estantería o se sientan.
+  goBrowse(person, visitsLeft = Phaser.Math.Between(1, 2)) {
+    const spotIndex = this.freeBrowseSpot(person.browseSpot);
+    this.releaseBrowseSpot(person);
+    if (spotIndex === null) {
+      this.afterBrowsing(person);
+      return;
+    }
+    this.browseTaken.add(spotIndex);
+    person.browseSpot = spotIndex;
+    person.state = 'entering';
+    this.walkTo(person, BROWSE_SPOTS[spotIndex], () => {
+      person.state = 'browsing';
+      person.startIdle('mirando');
+      this.scene.time.delayedCall(between(BROWSE_TIME), () => {
+        if (person.state !== 'browsing') return;
+        if (!person.isVisitor) this.wantsToTalk(person);
+        else if (visitsLeft > 1) this.goBrowse(person, visitsLeft - 1);
+        else this.afterBrowsing(person);
+      });
     });
   }
 
-  leaveQueue(customer) {
-    const index = this.queue.indexOf(customer);
-    if (index < 0) return;
-    this.queue.splice(index, 1);
-    // Los que esperaban avanzan un puesto
-    for (const other of this.queue) {
-      if (other.state === 'inLine' || other.state === 'entering') {
-        other.state = 'entering';
-        this.walkToQueueSpot(other);
-      }
-    }
+  // Un visitante, después de curiosear, se sienta a leer o se va
+  afterBrowsing(person) {
+    this.releaseBrowseSpot(person);
+    if (!this.trySitDown(person)) this.leave(person);
   }
 
   // ---------- Conversación y servicio ----------
 
-  wantsToTalk(customer) {
+  wantsToTalk(person) {
     // Solo si todavía está esperando (no si ya le han atendido o se ha ido)
-    if (!['entering', 'inLine', 'browsing'].includes(customer.state)) return;
-    customer.state = 'wantsTalk';
-    customer.showAlert(true);
+    if (!['entering', 'browsing'].includes(person.state)) return;
+    person.state = 'wantsTalk';
+    person.showAlert(true);
   }
 
-  // Lo llama la escena al pulsar "Hablar"; onFinished cuando ha leído todo el pedido
-  startTalking(customer) {
-    customer.state = 'talking';
-    customer.showAlert(false);
+  startTalking(person) {
+    person.state = 'talking';
+    person.showAlert(false);
   }
 
-  finishTalking(customer) {
-    customer.state = 'waitingServe';
+  finishTalking(person) {
+    person.state = 'waitingServe';
   }
 
-  startServing(customer) {
-    customer.state = 'serving';
+  startServing(person) {
+    person.state = 'serving';
   }
 
-  // Después de servir reacciona; cuando termina deja la cola y se sienta o se va
-  served(customer) {
-    customer.state = 'reacting';
+  served(person) {
+    person.state = 'reacting';
   }
 
-  afterReaction(customer) {
-    this.leaveQueue(customer);
-    if (customer.browseSpot !== undefined) {
-      this.browseTaken.delete(customer.browseSpot);
-      customer.browseSpot = undefined;
+  // Después de reaccionar se sienta (si se queda) o se marcha
+  afterReaction(person) {
+    if (this.atCounter === person) {
+      this.atCounter = null;
+      this.counterFreeAt = this.scene.time.now + between(COUNTER_REST);
     }
+    this.releaseBrowseSpot(person);
+    if (!(person.data.seQueda && this.trySitDown(person))) this.leave(person);
+  }
+
+  // ---------- Mesas ----------
+
+  trySitDown(person) {
     const free = SEATS.map((_, i) => i).filter((i) => !this.seatTaken.has(i));
-    if (customer.data.seQueda && free.length) {
-      this.sitDown(customer, Phaser.Utils.Array.GetRandom(free));
-    } else {
-      this.leave(customer);
-    }
-  }
-
-  sitDown(customer, seatIndex) {
+    if (!free.length) return false;
+    const seatIndex = Phaser.Utils.Array.GetRandom(free);
     const seat = SEATS[seatIndex];
     this.seatTaken.add(seatIndex);
-    customer.seat = seatIndex;
-    customer.state = 'toSeat';
-    this.walkTo(customer, seat.llegada, () => {
-      customer.walk([{ x: seat.x, y: seat.y }], () => {
-        customer.state = 'seated';
+    person.state = 'toSeat';
+    this.walkTo(person, seat.llegada, () => {
+      person.walk([{ x: seat.x, y: seat.y }], () => {
+        person.state = 'seated';
+        person.startIdle('sentado');
+        this.scheduleEmote(person);
         this.scene.time.delayedCall(between(SEATED_TIME), () => {
           // Se levanta: vuelve al punto libre junto a la silla y se marcha
-          customer.walk([seat.llegada], () => {
+          person.state = 'standing';
+          person.walk([seat.llegada], () => {
             this.seatTaken.delete(seatIndex);
-            this.leave(customer);
+            this.leave(person);
           });
         });
       });
     });
+    return true;
   }
 
-  leave(customer) {
-    customer.state = 'leaving';
-    customer.showAlert(false);
-    this.walkTo(customer, DOOR, () => {
-      customer.destroy();
-      Phaser.Utils.Array.Remove(this.customers, customer);
+  // Iconos de ambiente mientras está sentado: lo que hace (leer o tomar algo) y a veces un detalle
+  scheduleEmote(person) {
+    this.scene.time.delayedCall(between(EMOTE_EVERY), () => {
+      if (person.state !== 'seated') return;
+      const main = this.activityOf(person) === 'leer' ? 'libro' : 'taza';
+      person.showEmote(Math.random() < 0.7 ? main : Phaser.Utils.Array.GetRandom(['nota', 'corazon']));
+      this.scheduleEmote(person);
+    });
+  }
+
+  activityOf(person) {
+    if (person.isVisitor) return person.data.actividad;
+    return person.data.pide.libro ? 'leer' : 'tomar';
+  }
+
+  leave(person) {
+    person.state = 'leaving';
+    person.showAlert(false);
+    this.walkTo(person, DOOR, () => {
+      person.destroy();
+      Phaser.Utils.Array.Remove(this.people, person);
     });
   }
 
@@ -189,13 +260,12 @@ export default class CustomerManager {
   nearestInteraction(player, isBehindCounter, reach) {
     let best = null;
     let bestDistance = Infinity;
-    for (const customer of this.customers) {
-      if (customer.state !== 'wantsTalk' && customer.state !== 'waitingServe') continue;
-      const atCounter = this.queue[0] === customer;
-      const distance = Phaser.Math.Distance.Between(player.x, player.y, customer.x, customer.y);
-      const canReach = atCounter ? isBehindCounter : distance <= reach;
+    for (const person of this.people) {
+      if (person.state !== 'wantsTalk' && person.state !== 'waitingServe') continue;
+      const distance = Phaser.Math.Distance.Between(player.x, player.y, person.x, person.y);
+      const canReach = person === this.atCounter ? isBehindCounter : distance <= reach;
       if (canReach && distance < bestDistance) {
-        best = { customer, kind: customer.state === 'wantsTalk' ? 'talk' : 'serve' };
+        best = { customer: person, kind: person.state === 'wantsTalk' ? 'talk' : 'serve' };
         bestDistance = distance;
       }
     }
@@ -204,13 +274,14 @@ export default class CustomerManager {
 
   // ¿Hay alguien esperando en el mostrador o llamándote con "!"?
   pending() {
+    const waiting = (p) => ['wantsTalk', 'waitingServe'].includes(p.state);
     return {
-      counter: this.queue[0] && ['wantsTalk', 'waitingServe'].includes(this.queue[0].state),
-      shelves: this.customers.some((c) => !this.queue.includes(c) && ['wantsTalk', 'waitingServe'].includes(c.state)),
+      counter: Boolean(this.atCounter && waiting(this.atCounter)),
+      shelves: this.people.some((p) => p !== this.atCounter && waiting(p)),
     };
   }
 
   update() {
-    for (const customer of this.customers) customer.update();
+    for (const person of this.people) person.update();
   }
 }
