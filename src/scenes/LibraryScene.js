@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { LIBRARY_BACKGROUND, LIBRARY_OBSTACLES, PLAYER_START } from '../data/libraryLayout.js';
 import Pathfinder from '../systems/Pathfinder.js';
 import Player from '../objects/Player.js';
+import VirtualJoystick from '../ui/VirtualJoystick.js';
 
 // Interior de la librería-cafetería: el personaje camina por ella.
 export default class LibraryScene extends Phaser.Scene {
@@ -37,8 +38,12 @@ export default class LibraryScene extends Phaser.Scene {
       margin: { x: 5, top: 3, bottom: 3 },
     });
 
-    // Tocar (móvil) o hacer clic (PC) para caminar hasta ese punto
+    // Móvil: arrastrar el dedo para deslizar al personaje (joystick flotante)
+    this.joystick = new VirtualJoystick(this);
+
+    // PC: hacer clic para caminar hasta ese punto
     this.input.on('pointerdown', (pointer) => {
+      if (pointer.wasTouch) return;
       const path = this.pathfinder.findPath(this.player.body.x, this.player.body.y, pointer.x, pointer.y);
       this.player.walkTo(path);
       this.showTapMarker(pointer.x, pointer.y);
@@ -65,6 +70,6 @@ export default class LibraryScene extends Phaser.Scene {
   }
 
   update() {
-    this.player.update(this.keys);
+    this.player.update(this.keys, this.joystick);
   }
 }

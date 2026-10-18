@@ -34,13 +34,15 @@ Juego *cozy* de gestión, exploración y construcción. Heredas la librería-caf
 
 - **Vista cenital en 3/4** sobre cuadrícula recta (como Stardew Valley o Cozy Grove).
 - **Pixel art "suave":** contornos suaves, paletas armónicas poco saturadas, luz ambiental. Ver `gat/narrative/world.md` §7.
-- **Arte inicial:** formas de colores en el prototipo y, después, packs de pixel art ya hechos (itch.io). El arte propio o encargado vendrá más adelante.
+- **Arte inicial:** imágenes generadas con ChatGPT y limpiadas con `tools/clean_art.py` (cuadrícula real de píxeles y colores limitados). Personaje provisional con formas.
+- **Arte definitivo:** se rediseñará la librería y todo lo demás más adelante.
+- **Paleta de colores común:** se definirá una paleta propia para lugares, personajes, objetos e interfaz. Toda imagen nueva se ajustará a ella con `tools/clean_art.py`, para que el juego tenga un estilo coherente.
 
 ## 5. Controles
 
 | Acción | Móvil | PC |
 |---|---|---|
-| Moverse | Tocar un punto del suelo | Clic en un punto o teclado (WASD / flechas) |
+| Moverse | Arrastrar el dedo: el personaje se desliza en esa dirección (joystick flotante) | Clic en un punto o teclado (WASD / flechas) |
 | Interactuar | Tocar el personaje u objeto | Clic o tecla de acción |
 | Construir | Arrastrar y soltar en la cuadrícula | Arrastrar con el ratón |
 | Menús | Tarjetas y botones grandes, pensados para dedos | Los mismos |
@@ -110,4 +112,4 @@ El **catálogo de construcción** crece con la historia: algunos recuerdos desbl
 - Sistema de guardado (en el navegador, en la nube…).
 - Música y sonido.
 - Nombre del juego.
-- Dirección de arte definitiva y qué packs de arte usar.
+- Dirección de arte definitiva, rediseño de la librería y paleta de colores común.

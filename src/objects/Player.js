@@ -27,15 +27,19 @@ export default class Player {
     this.path = points ?? [];
   }
 
-  update(keys) {
+  update(keys, joystick) {
     const body = this.body.body;
     const keyboard = new Phaser.Math.Vector2(
       (keys.right.isDown || keys.d.isDown ? 1 : 0) - (keys.left.isDown || keys.a.isDown ? 1 : 0),
       (keys.down.isDown || keys.s.isDown ? 1 : 0) - (keys.up.isDown || keys.w.isDown ? 1 : 0),
     );
 
-    if (keyboard.lengthSq() > 0) {
-      // El teclado tiene prioridad y cancela el paseo por toque
+    if (joystick.isActive()) {
+      // Móvil: cuanto más arrastras el dedo, más rápido camina (hasta la velocidad máxima)
+      this.path = [];
+      body.setVelocity(joystick.direction.x * SPEED, joystick.direction.y * SPEED);
+    } else if (keyboard.lengthSq() > 0) {
+      // PC: el teclado cancela el paseo por clic
       this.path = [];
       body.setVelocity(keyboard.x, keyboard.y);
       body.velocity.normalize().scale(SPEED);
