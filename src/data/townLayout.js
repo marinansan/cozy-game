@@ -8,10 +8,10 @@
 export const TOWN_SIZE = { width: 1600, height: 1200 };
 
 // Al salir de la librería apareces aquí, delante de su puerta
-export const TOWN_START = { x: 800, y: 1080 };
+export const TOWN_START = { x: 826, y: 1080 };
 
 // Puerta de la librería: al acercarte pregunta si quieres entrar
-export const LIBRARY_DOOR = { x: 800, y: 1072, radio: 22 };
+export const LIBRARY_DOOR = { x: 826, y: 1072, radio: 22 };
 
 export const COLORS = {
   hierba: 0x8fae5d,
@@ -32,8 +32,8 @@ export const PLAZA = { x: 800, y: 620, radio: 95, fuente: 26 };
 export const PATHS = [
   // De la librería a la plaza (rodea la librería por la izquierda)
   [
-    { x: 800, y: 1062 },
-    { x: 790, y: 1100 },
+    { x: 826, y: 1068 },
+    { x: 800, y: 1100 },
     { x: 700, y: 1105 },
     { x: 640, y: 1040 },
     { x: 650, y: 920 },
@@ -95,7 +95,7 @@ export const BUILDINGS = [
     tejado: 50,
     pared: 0xc9a27a,
     techo: 0x4a3b5c,
-    imagen: { archivo: 'libreria-exterior.png', origen: { x: 0.4866, y: 0.9658 } },
+    imagen: { archivo: 'libreria-exterior.png', origen: { x: 0.4608, y: 0.8102 } },
   },
   { id: 'casaOeste', nombre: 'Casa antigua', x: 250, y: 430, w: 120, h: 50, tejado: 45, pared: 0xb89a7a, techo: 0x5a4a4a },
   { id: 'casaSuroeste', nombre: 'Casa antigua', x: 330, y: 980, w: 110, h: 50, tejado: 40, pared: 0xb08f6e, techo: 0x56463f },
