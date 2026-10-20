@@ -51,9 +51,11 @@ Comprobar que el corazón del juego funciona y resulta relajante: **un día comp
 - Si te equivocas, te da otra pista. Si aciertas, se despide.
 - ✅ *Se ve:* el ritual completo.
 
-### Paso 6. La niebla retrocede
-- Al despedirse el espíritu: +1 recuerdo y una animación de la niebla retirándose.
-- Aparece una nueva zona con un banco antiguo (la huella del recuerdo).
+### Paso 6. La niebla retrocede ✔️ (hecho: el río y el taller de Okiku)
+- El pueblo está dividido en zonas (boceto `gat/overview/mapa-boceto.png`): al empezar solo está abierta la zona 0 (estación y calle); el resto está cubierto de niebla.
+- Al despedirse el espíritu: +1 recuerdo y la librería recibe más gente (sube la etapa del barrio).
+- La próxima vez que sales al barrio, la cámara viaja a la zona del recuerdo, **la niebla se disipa** y aparecen el río, el puente de madera y el taller de farolillos.
+- Se **enciende el primer farolillo** de las escaleras del santuario (uno por cada recuerdo).
 - ✅ *Se ve:* el momento mágico que resume el juego.
 
 ## Después del prototipo

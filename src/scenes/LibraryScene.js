@@ -15,6 +15,7 @@ import { VIEW, ZOOM } from '../config.js';
 import { state } from '../systems/GameState.js';
 import { scoreDrink, serveResult } from '../systems/cafe.js';
 import { SPIRITS } from '../data/spirits.js';
+import { NEIGHBORHOOD_STAGES } from '../data/cafe.js';
 import { CLUES } from '../data/townLayout.js';
 import Spirit from '../objects/Spirit.js';
 import Pathfinder from '../systems/Pathfinder.js';
@@ -415,6 +416,8 @@ export default class LibraryScene extends Phaser.Scene {
               spirit.vanish(() => {
                 state.spirits[data.id] = 'resuelto';
                 state.memories += 1;
+                // Con cada recuerdo el barrio despierta un poco y viene más gente a la librería
+                state.neighborhoodStage = Math.min(state.memories, NEIGHBORHOOD_STAGES.length - 1);
                 this.ui.showTitle('✨ Has recuperado un recuerdo');
               });
               this.spirit = null;
