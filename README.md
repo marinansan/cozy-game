@@ -18,5 +18,5 @@ Phaser 3 (juego web en JavaScript). Plataformas iniciales: navegador en PC y mó
 
 ## Cómo probar el juego
 
-- **En la web:** https://incredible-haupia-14d6f5.netlify.app (Netlify; se actualiza solo con cada cambio en `main`).
+- **En la web:** https://marinansan.github.io/cozy-game/ (GitHub Pages; se actualiza solo con cada cambio en `main`).
 - **En local:** `npm install` y después `npm run dev`; abre la dirección que aparece en la terminal.
