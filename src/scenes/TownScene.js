@@ -175,7 +175,7 @@ export default class TownScene extends Phaser.Scene {
         continue;
       }
 
-      const wallHeight = b.id === 'bloque' ? 90 : 32;
+      const wallHeight = 32;
       const c = isoCorners(b.x, b.y, b.w, b.h);
       const g = this.add.graphics();
 
@@ -193,15 +193,9 @@ export default class TownScene extends Phaser.Scene {
         const p2 = toIso(b.x + to, b.y + b.h);
         g.fillStyle(color).fillPoints([up(p1, bottom), up(p2, bottom), up(p2, top), up(p1, top)], true);
       };
-      if (b.id === 'bloque') {
-        for (let wx = 10; wx < b.w - 20; wx += 30) {
-          for (let wy = 14; wy < wallHeight - 10; wy += 22) onLeftFace(wx, wx + 16, wy, wy + 12, 0x6f6f6f);
-        }
-      } else {
-        onLeftFace(b.w / 2 - 9, b.w / 2 + 9, 0, 22, 0x5b3a29);
-        onLeftFace(10, 32, 10, 22, 0xf2d38a);
-        onLeftFace(b.w - 32, b.w - 10, 10, 22, 0xf2d38a);
-      }
+      onLeftFace(b.w / 2 - 9, b.w / 2 + 9, 0, 22, 0x5b3a29);
+      onLeftFace(10, 32, 10, 22, 0xf2d38a);
+      onLeftFace(b.w - 32, b.w - 10, 10, 22, 0xf2d38a);
 
       const labelAt = toIso(b.x + b.w / 2, b.y + b.h / 2);
       this.addLabel(labelAt.x, labelAt.y - ridgeRaise - 8, b.nombre);

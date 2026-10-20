@@ -38,27 +38,29 @@ Un adulto joven (25–30 años), **nombre y aspecto elegidos por el jugador**, p
 
 ## 6. Premisa y conflicto
 
-- **Situación inicial:** el barrio tradicional de la infancia fue derribado para construir un gran complejo moderno. El proyecto **se abandonó a medias** (crisis económica): quedan unos pocos bloques grises junto a la estación y muchos solares vallados.
-- **La librería** es lo único que sigue en pie: la abuela se negó a vender.
-- **La niebla del olvido** cubre las zonas olvidadas del barrio.
-- **Conflicto:** el barrio ha perdido su alma; sus recuerdos vagan como espíritus perdidos; el árbol guardián fue talado y su espíritu duerme; el hombre que lo provocó vive con el arrepentimiento.
+- **Situación inicial:** el barrio tradicional de la infancia del protagonista está **casi vacío y cubierto de niebla**. Las casas siguen ahí, pero la gente se fue poco a poco sin saber muy bien por qué.
+- **La librería** es el único lugar que siguió con la luz encendida: la abuela nunca se marchó.
+- **La niebla del olvido** cubre las zonas que el barrio ha olvidado.
+- **Conflicto:** algo misterioso ocurrió una noche de verano hace años. Desde entonces el espíritu guardián del gran árbol duerme, los recuerdos del barrio vagan como espíritus perdidos y un anciano carga en silencio con la culpa.
 
 ## 7. Lo que está en juego
 
 Personal y comunitario, nunca catastrófico:
 - Que el barrio vuelva a ser un hogar (vecinos, vida, comunidad).
-- Que los recuerdos del barrio antiguo encuentren paz y no se pierdan.
+- Que los recuerdos del barrio encuentren paz y no se pierdan.
 - Que el protagonista recupere su propia esencia.
-- Que la abuela y el arquitecto se reconcilien, aunque sea a través de una carta.
+- Que el farolero se perdone y que el festival vuelva a celebrarse.
 
-## 8. El misterio mayor
+## 8. El misterio mayor: la noche de los farolillos apagados
 
-**Pregunta motora:** ¿qué pasó entre la abuela y el arquitecto, y qué dejó ella pendiente?
+**Pregunta motora:** ¿qué pasó la noche en que el barrio empezó a olvidar, y qué dejó pendiente la abuela?
 
-- El **arquitecto** fue el niño al que la abuela casi crió en la librería; ella le animó a estudiar arquitectura. Volvió adulto para "modernizar" el barrio; ella se negó a vender. No volvieron a hablarse.
-- La abuela dejó **una carta** para él, repartida en **fragmentos** que el jugador encuentra en los recuerdos nocturnos.
-- El **espíritu del árbol** (alcanforero del santuario) despierta poco a poco con cada recuerdo recuperado.
+- Cada verano, el barrio celebraba un **festival de farolillos** para mantener despierto al **espíritu guardián del gran árbol** del santuario.
+- El **farolero**, un anciano del barrio, era el encargado de **encender el primer farolillo**. Un año, por algo que le pasó *(abierto: una pelea con la abuela, una pérdida, un miedo)*, **no lo encendió**.
+- Esa noche el espíritu del árbol se durmió y **subió la niebla**. Poco a poco la gente **olvidó el barrio** y se fue sin saber por qué.
+- La abuela siguió con la librería encendida, como último farolillo del barrio, y dejó **una carta** repartida en **fragmentos** que el jugador encuentra en los recuerdos nocturnos.
 - El **gato de la abuela** guarda un secreto relacionado con ella *(abierto)*.
+- **Objetivo del juego:** reunir los recuerdos para volver a celebrar el festival. **Final:** el farolero enciende por fin el primer farolillo y el árbol despierta.
 
 ## 9. Estructura
 
@@ -66,17 +68,17 @@ Un año dividido en **cuatro estaciones = cuatro capítulos**, de verano a prima
 
 | Capítulo | Arco |
 |---|---|
-| Verano | Llegada, choque entre recuerdo y realidad, primer espíritu, aparece el arquitecto |
-| Otoño | La infancia del arquitecto en la librería; llega el ayudante |
-| Invierno | La pelea entre abuela y arquitecto; el espíritu del árbol despierta |
-| Primavera | La última voluntad de la abuela; entrega de la carta; el árbol florece; *hanami* |
+| Verano | Llegada, choque entre recuerdo y realidad, primer espíritu (el farolillo apagado), aparece el farolero |
+| Otoño | Recuerdos de los festivales de antes; quién era el farolero para la abuela; llega el ayudante |
+| Invierno | La noche de los farolillos apagados; el farolero confiesa; el espíritu del árbol se agita |
+| Primavera | La carta de la abuela; el festival vuelve a celebrarse; el farolero enciende el primer farolillo; el árbol despierta y florece |
 
 **Final único.** Las decisiones de diálogo son de tono; las consecuencias reales son visibles (cómo construyes y personalizas el barrio). Después del final, juego infinito.
 
 ## 10. Introducción animada
 
 Estilo libro ilustrado (ilustraciones con movimiento suave y narración) para contener costes.
-- Cuenta **qué pasó**: el barrio de los veranos de infancia, su derribo, el proyecto abandonado, la niebla.
+- Cuenta **qué pasó**: el barrio de los veranos de infancia, el festival de farolillos, la gente que se fue poco a poco, la niebla.
 - Presenta la **herencia** y el **papel del protagonista**, y anticipa que su llegada puede cambiar el barrio.
 - **No revela por qué** (eso es el misterio).
 
@@ -97,7 +99,8 @@ Estilo libro ilustrado (ilustraciones con movimiento suave y narración) para co
 
 ## 13. Preguntas abiertas
 
-- Nombres: el juego, el barrio, la abuela, el arquitecto, el gato, el ayudante.
+- Nombres: el juego, el barrio, la abuela, el farolero, el gato, el ayudante.
+- Qué le pasó al farolero la noche en que no encendió el farolillo.
 - Contenido exacto de la carta y número de fragmentos.
 - El secreto del gato.
 - Lista concreta de espíritus y vecinos por estación (ver `characters.md`, `quests.md`).

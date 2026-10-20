@@ -11,10 +11,10 @@ Un año en **cuatro estaciones = cuatro capítulos**. Sin límites de tiempo ni 
 
 | Estación | Zona que se despeja | Recuerdo clave | Avance del misterio | Hito |
 |---|---|---|---|---|
-| **Verano** (llegada) | Calle de la librería y plaza | El festival de verano de la infancia del protagonista | Primer fragmento de la carta; aparece el arquitecto como cliente | Primer espíritu; primeros vecinos |
-| **Otoño** | *Sentō* y mercado | La infancia del arquitecto en la librería | Se descubre quién fue él para la abuela | Llega el ayudante |
-| **Invierno** | Santuario y árbol talado | La pelea entre la abuela y el arquitecto | Momento más melancólico; el espíritu del árbol despierta | El barrio se une |
-| **Primavera** | Río y colina | La última voluntad de la abuela | Se entrega la carta | El árbol florece; fiesta del *hanami* |
+| **Verano** (llegada) | Calle de la librería y plaza | El festival de farolillos de la infancia del protagonista | Primer fragmento de la carta; el farolillo apagado; aparece el farolero como cliente | Primer espíritu; primeros vecinos |
+| **Otoño** | *Sentō* y mercado | Los festivales de antes | Se descubre quién era el farolero para la abuela | Llega el ayudante |
+| **Invierno** | Santuario y árbol dormido | La noche de los farolillos apagados | El farolero confiesa; momento más melancólico; el espíritu del árbol se agita | El barrio se une |
+| **Primavera** | Río y colina | La última voluntad de la abuela | La carta completa | Vuelve el festival: el farolero enciende el primer farolillo, el árbol despierta y florece |
 
 **Volumen por estación (estimado):** 1 recuerdo principal + 2–3 espíritus menores + 2–3 vecinos con historia + solares de casas.
 
@@ -44,10 +44,10 @@ Estructura fija, relajante y reconocible:
 ## 4. Arco del misterio principal (beats)
 
 1. **Intro:** animación (qué pasó, no por qué). Llegada; choque entre recuerdo y realidad.
-2. **Verano:** primer espíritu; el gato ve algo que el protagonista también ve. Un anciano silencioso toma café cada mañana. Primer fragmento de la carta.
-3. **Otoño:** los recuerdos del mercado y del *sentō* muestran a un niño dibujando edificios en la librería. El protagonista ata cabos: el anciano es el arquitecto.
-4. **Invierno:** en el santuario, el recuerdo de la pelea. El arquitecto se abre por primera vez. El espíritu del árbol despierta.
-5. **Primavera:** la última voluntad de la abuela; la carta completa. El protagonista se la entrega al arquitecto bajo el árbol en flor durante el *hanami*, con todo el barrio presente.
+2. **Verano:** primer espíritu, ligado a un farolillo apagado; el gato ve algo que el protagonista también ve. Un anciano silencioso toma café cada mañana. Primer fragmento de la carta.
+3. **Otoño:** los recuerdos del mercado y del *sentō* hablan de los festivales y de quien encendía el primer farolillo. El protagonista ata cabos: el anciano es el farolero.
+4. **Invierno:** en el santuario, el recuerdo de la noche de los farolillos apagados. El farolero confiesa por primera vez. El espíritu del árbol se agita.
+5. **Primavera:** la última voluntad de la abuela; la carta completa. Con todo el barrio presente, el festival vuelve a celebrarse: el farolero enciende el primer farolillo, el árbol despierta y florece.
 6. **Post-final:** el barrio sigue vivo; espíritus menores y vecinos siguen llegando; fiestas anuales.
 
 ## 5. Elecciones y consecuencias
@@ -61,7 +61,7 @@ Estructura fija, relajante y reconocible:
 - Gestión de librería-cafetería (bebidas, recetas, recomendaciones de libros).
 - Ciclo de día y noche con horario.
 - Exploración con niebla y desbloqueo de zonas.
-- Construcción y personalización (zonas públicas, solares de casas, transformación de bloques modernos).
+- Construcción y personalización (zonas públicas, solares de casas, recuperación de casas vacías).
 - Llegada y gestión de vecinos.
 - Ritual con los espíritus (escuchar, buscar y ofrecer).
 - Inventario de libros y objetos.

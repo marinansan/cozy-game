@@ -12,9 +12,9 @@ Un barrio residencial japonés a las afueras de una ciudad, conectado por tren c
 ## 2. Historia del lugar
 
 1. **El barrio antiguo:** comunidad viva y familiar. La librería-cafetería de la abuela era su corazón.
-2. **El proyecto moderno:** el arquitecto (criado en la librería) diseñó un gran complejo para "dar futuro" al barrio. Se derribaron las casas y se taló el árbol del santuario. La abuela se negó a vender.
-3. **El abandono:** una crisis económica (ecos de la burbuja japonesa) paró las obras a medias. Quedaron unos pocos bloques grises junto a la estación y muchos solares vallados.
-4. **El olvido:** sin casas, sin vecinos y sin árbol, el barrio olvidó lo que fue. Se instaló la niebla.
+2. **El festival de farolillos:** cada verano, el barrio encendía farolillos para mantener despierto al espíritu guardián del gran árbol del santuario. El farolero encendía el primero.
+3. **La noche de los farolillos apagados:** un año, el farolero no encendió el primer farolillo. El espíritu del árbol se durmió y subió la niebla.
+4. **El olvido:** poco a poco la gente olvidó el barrio y se fue sin saber por qué. Las casas quedaron vacías y la niebla cubrió gran parte del barrio. Solo la librería de la abuela siguió encendida.
 5. **Presente:** la abuela ha muerto y el protagonista hereda la librería.
 
 ## 3. Reglas del mundo (siempre ciertas)
@@ -24,7 +24,7 @@ Un barrio residencial japonés a las afueras de una ciudad, conectado por tren c
 - **Solo la librería** es un lugar donde los espíritus pueden manifestarse y donde los recuerdos pueden guardarse.
 - **Solo el protagonista y el gato** ven a los espíritus. Los vecinos no, aunque a veces "sienten" algo.
 - **Cada recuerdo cerrado deja una huella** en el mundo real: un árbol que florece, un banco antiguo, un mural, una receta recuperada… y atrae a un vecino de día.
-- **Nada se destruye.** Lo moderno se transforma (jardines en balcones, murales, farolillos, mercadillos), nunca se derriba.
+- **Nada se destruye.** El barrio no se derriba ni se sustituye: se recupera (casas que se vuelven a habitar, jardines, farolillos, mercadillos).
 - **No hay forma de fallar.** Los espíritus responden con cariño a los errores y dan otra pista.
 
 **Lo que nunca ocurre:** violencia, villanos, terror, muertes explícitas, castigos al jugador.
@@ -35,9 +35,9 @@ Un barrio residencial japonés a las afueras de una ciudad, conectado por tren c
 |---|---|---|---|
 | **La librería-cafetería** | En pie, polvorienta | Inicio | Corazón del juego; día (vecinos) y noche (espíritus) |
 | **Calle de la librería y plaza** | Parcialmente en niebla | Verano | Primer contacto; recuerdo del festival de verano |
-| **Bloques modernos (estación)** | Grises, poco habitados | Inicio | Contraste; se transforman, no se derriban; el arquitecto vive cerca |
-| **El *sentō* y el mercado** | Niebla | Otoño | Vida comunitaria; infancia del arquitecto |
-| **El santuario y el árbol talado** | Niebla | Invierno | El espíritu guardián dormido; momento más melancólico |
+| **Casa del farolero** | Habitada, cerrada | Inicio | El único vecino que se quedó; guarda los farolillos del festival |
+| **El *sentō* y el mercado** | Niebla | Otoño | Vida comunitaria; recuerdos de los festivales |
+| **El santuario y el árbol dormido** | Niebla | Invierno | El espíritu guardián dormido (árbol seco, sin hojas); momento más melancólico |
 | **El río y la colina** | Niebla | Primavera | Final; *hanami* bajo el árbol renacido |
 | **Solares de casas** | Niebla, distribuidos por zonas | Progresivo | Repoblación: llegada de nuevos vecinos |
 
@@ -53,7 +53,7 @@ Al despejarse la niebla aparece **tierra, césped y restos del pasado** (cimient
 
 - La **niebla** y los **solares vallados** cuentan el abandono.
 - **Restos del barrio antiguo** dentro de la niebla: cimientos, faroles rotos, un columpio, letreros.
-- El **tocón del alcanforero** en el santuario: visible desde el principio, sin explicación.
+- El **alcanforero seco** del santuario: visible desde el principio, sin hojas, sin explicación.
 - **La naturaleza que crece en lo gris** (flores entre tuberías y cemento) como signo de esperanza.
 - **El cambio de color** del barrio a medida que avanza el juego.
 - **Estaciones** marcadas: verano verde, otoño ocre y rojo, invierno blanco, primavera rosa.
@@ -64,13 +64,13 @@ Al despejarse la niebla aparece **tierra, césped y restos del pasado** (cimient
 
 | Elemento | Dirección visual |
 |---|---|
-| Barrio olvidado / niebla / bloques | Gris verdoso desaturado (ref.: callejón urbano con flores amarillas) |
+| Barrio olvidado / niebla / casas vacías | Gris verdoso desaturado (ref.: callejón urbano con flores amarillas) |
 | Zonas recuperadas | Verde vivo, turquesa, ocres cálidos (ref.: estanque, puente otoñal, gatos junto al río) |
 | La librería de noche | Ámbar de farolillo sobre azul noche, lluvia (ref.: panadería nocturna) |
 | Interiores y decoración | Cálidos, detallados, personalizables (ref.: tienda de verduras, baño) |
 | Espíritus | Figuras translúcidas con brillo ámbar suave; nada aterrador *(propuesta)* |
 | Gato de la abuela | Negro, casi una silueta, ojos expresivos (ref.: gato en la pasarela) |
-| Árbol guardián | Gran alcanforero; tocón al inicio, renace por fases |
+| Árbol guardián | Gran alcanforero; seco y sin hojas al inicio, renace por fases |
 
 **Motivos recurrentes:** la luz cálida en la ventana, las flores que brotan en lo gris, la niebla que se retira, el árbol.
 

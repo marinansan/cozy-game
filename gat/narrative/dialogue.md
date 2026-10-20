@@ -16,7 +16,7 @@
 
 | Formato | Uso |
 |---|---|
-| Conversación breve (3–8 burbujas) | Vecinos con historia, espíritus, arquitecto |
+| Conversación breve (3–8 burbujas) | Vecinos con historia, espíritus, farolero |
 | Frases sueltas (*barks*) | Vecinos ligeros, comentarios de clientes, reacciones |
 | Elecciones de tono (2–3 opciones) | Cariño / humor / pregunta; no cambian la trama |
 | Texto del Libro del barrio | Resumen poético de cada recuerdo recuperado |
@@ -27,7 +27,7 @@
 
 - **Protagonista:** neutra y amable; habla poco; nunca impone una opinión fuerte.
 - **Abuela (carta, recuerdos):** cálida, directa, con refranes y metáforas de libros y té.
-- **Arquitecto:** formal, contenido, frases que se quedan a medias; se suaviza con el tiempo.
+- **Farolero:** parco, amable, frases que se quedan a medias; evita hablar del festival; se suaviza con el tiempo.
 - **Espíritus:** confusos al llegar (frases incompletas, recuerdos sueltos); claros y agradecidos al despedirse.
 - **Gato:** no habla; gestos, sonidos y miradas.
 - **Vecinos:** cada uno con un tic o tema propio (oficio, familia, comida).

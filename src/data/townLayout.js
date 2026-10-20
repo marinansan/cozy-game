@@ -99,7 +99,6 @@ export const BUILDINGS = [
   },
   { id: 'casaOeste', nombre: 'Casa antigua', x: 250, y: 430, w: 120, h: 50, tejado: 45, pared: 0xb89a7a, techo: 0x5a4a4a },
   { id: 'casaSuroeste', nombre: 'Casa antigua', x: 330, y: 980, w: 110, h: 50, tejado: 40, pared: 0xb08f6e, techo: 0x56463f },
-  { id: 'bloque', nombre: 'Bloque moderno a medio construir', x: 1260, y: 990, w: 190, h: 110, tejado: 60, pared: 0x9a9a9a, techo: 0x7d7d7d },
 ];
 
 // Solar vallado: aquí se podrá construir más adelante (abertura en la valla arriba)
