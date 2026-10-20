@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { RENDER, VIEW } from './config.js';
+import { state } from './systems/GameState.js';
 import LibraryScene from './scenes/LibraryScene.js';
 import TownScene from './scenes/TownScene.js';
 
@@ -42,5 +43,6 @@ game.events.once('ready', syncUi);
 game.scale.on('resize', () => requestAnimationFrame(syncUi));
 window.addEventListener('resize', () => requestAnimationFrame(syncUi));
 
-// Acceso para pruebas desde la consola del navegador
+// Acceso para pruebas desde la consola del navegador (estado del juego incluido)
 window.__game = game;
+window.__state = state;

@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import {
   BARISTA_ZONE,
+  COUNTER_SPOT,
+  DOOR,
   LAMPS,
   LIBRARY_BACKGROUND,
   LIBRARY_OBSTACLES,
@@ -11,7 +13,10 @@ import {
 import { PHASES } from '../data/phases.js';
 import { VIEW, ZOOM } from '../config.js';
 import { state } from '../systems/GameState.js';
-import { serveResult } from '../systems/cafe.js';
+import { scoreDrink, serveResult } from '../systems/cafe.js';
+import { SPIRITS } from '../data/spirits.js';
+import { CLUES } from '../data/townLayout.js';
+import Spirit from '../objects/Spirit.js';
 import Pathfinder from '../systems/Pathfinder.js';
 import CustomerManager from '../systems/CustomerManager.js';
 import Player from '../objects/Player.js';
@@ -23,6 +28,7 @@ const FLOAT_OFFSET = 24; // el texto de yenes sale por encima de la cabeza
 const QUESTION_OFFSET = 26; // la pregunta (Sí / No) sale por encima del personaje
 const TALK_REACH = 30; // distancia para hablar con alguien en las estanterías
 const FADE_TIME = 600; // milisegundos del fundido entre fases
+const SPIRIT_DELAY = 2500; // el espíritu llega un rato después de abrir de noche
 
 // Interior de la librería-cafetería: el personaje camina por ella, atiende a los clientes
 // y el día pasa por tres fases (mañana, tarde y noche) cuando el jugador decide.
@@ -202,6 +208,8 @@ export default class LibraryScene extends Phaser.Scene {
     }
 
     if (phaseId === 'manana') this.customers.startDay(state.neighborhoodStage);
+    if (phaseId === 'noche') this.startNight();
+    else this.endNight();
   }
 
   // Fundido a negro, cambio de fase y vuelta a la luz
@@ -329,6 +337,116 @@ export default class LibraryScene extends Phaser.Scene {
     });
   }
 
+  // ---------- Espíritus (de noche) ----------
+
+  // Si queda algún espíritu por ayudar, llega un rato después de abrir de noche
+  startNight() {
+    this.endNight();
+    const data = SPIRITS.find((sp) => state.spirits[sp.id] !== 'resuelto');
+    if (!data) return;
+    this.spiritTimer = this.time.delayedCall(SPIRIT_DELAY, () => {
+      const spirit = new Spirit(this, data, DOOR.x, DOOR.y - 10);
+      this.spirit = spirit;
+      spirit.appear();
+      const path = this.pathfinder.findPath(DOOR.x, DOOR.y - 10, COUNTER_SPOT.x, COUNTER_SPOT.y);
+      spirit.walk(path, () => {
+        spirit.state = 'wantsTalk';
+        spirit.showAlert(true);
+      });
+    });
+  }
+
+  endNight() {
+    this.spiritTimer?.remove();
+    this.spiritTimer = null;
+    this.spirit?.destroy();
+    this.spirit = null;
+  }
+
+  // Escuchar: la primera noche cuenta lo que recuerda y se desvanece;
+  // las siguientes pregunta si has encontrado algo
+  talkToSpirit() {
+    const spirit = this.spirit;
+    const data = spirit.data;
+    const firstVisit = state.spirits[data.id] !== 'escuchado';
+    this.player.stop();
+    spirit.state = 'talking';
+    spirit.showAlert(false);
+    const pages = firstVisit ? data.primeraVisita : data.regreso;
+    this.ui.showBubble(spirit.x, spirit.y + BUBBLE_OFFSET, data.nombre, pages, () => {
+      if (!firstVisit) {
+        spirit.state = 'waitingServe';
+        return;
+      }
+      state.spirits[data.id] = 'escuchado';
+      spirit.state = 'leaving';
+      this.time.delayedCall(1500, () => {
+        this.ui.hideBubble();
+        spirit.vanish();
+        this.spirit = null;
+      });
+    });
+  }
+
+  // Ofrecer: una bebida y un objeto encontrado en el barrio
+  offerToSpirit() {
+    const spirit = this.spirit;
+    const data = spirit.data;
+    spirit.state = 'serving';
+    this.player.stop();
+    this.setAction(null);
+    this.ui.showHint(null);
+    this.ui.hideBubble();
+    const objetos = CLUES.filter((c) => state.inventory.includes(c.id));
+    const asked = { nombre: data.nombre, pedido: data.regreso, pide: data.pide };
+
+    this.ui.openServe(
+      asked,
+      (served) => {
+        const drinkOk = scoreDrink(served.bebida, data.pide.bebida) === 1;
+        const objectOk = served.objeto === data.pide.objeto;
+        spirit.state = 'reacting';
+
+        if (drinkOk && objectOk) {
+          // Recuerda quién era, se despide y se convierte en un recuerdo recuperado
+          this.ui.showBubble(spirit.x, spirit.y + BUBBLE_OFFSET, data.nombreReal, data.despedida, () => {
+            this.time.delayedCall(1200, () => {
+              this.ui.hideBubble();
+              spirit.vanish(() => {
+                state.spirits[data.id] = 'resuelto';
+                state.memories += 1;
+                this.ui.showTitle('✨ Has recuperado un recuerdo');
+              });
+              this.spirit = null;
+            });
+          });
+          return;
+        }
+
+        // No pasa nada por equivocarse: te da otra pista y puedes volver a intentarlo
+        const hint = objectOk ? data.pistaBebida : data.pistaObjeto;
+        this.ui.showBubble(spirit.x, spirit.y + BUBBLE_OFFSET, data.nombre, hint, () => {
+          spirit.state = 'waitingServe';
+        });
+      },
+      { objetos },
+    );
+  }
+
+  updateNight() {
+    const spirit = this.spirit;
+    const waiting = spirit && ['wantsTalk', 'waitingServe'].includes(spirit.state);
+    const ready = waiting && !this.ui.isBubbleOpen() && this.isBehindCounter();
+    if (ready && spirit.state === 'wantsTalk') this.setAction('💬 Hablar', () => this.talkToSpirit());
+    else if (ready) this.setAction('🏮 Ofrecer', () => this.offerToSpirit());
+    else this.setAction(null);
+
+    if (this.ui.isBubbleOpen() || ready) this.ui.showHint(null);
+    else if (waiting) this.ui.showHint('Un espíritu te espera en el mostrador ✨ (entra por la derecha)');
+    else if (spirit) this.ui.showHint('Algo brilla junto a la entrada…');
+    else this.ui.showHint('Noche: cuando quieras, ve a la cortina del fondo para dormir');
+  }
+
   // ---------- Acción disponible y pistas ----------
 
   setAction(label, callback) {
@@ -337,13 +455,13 @@ export default class LibraryScene extends Phaser.Scene {
   }
 
   updateActionAndHint() {
-    if (this.phase !== 'manana') {
+    if (this.phase === 'noche') {
+      this.updateNight();
+      return;
+    }
+    if (this.phase === 'tarde') {
       this.setAction(null);
-      this.ui.showHint(
-        this.phase === 'tarde'
-          ? 'Tarde: ve a la puerta para salir al barrio o abrir de noche'
-          : 'Noche: pronto llegarán los espíritus. Ve a la cortina del fondo para dormir',
-      );
+      this.ui.showHint('Tarde: ve a la puerta para salir al barrio o abrir de noche');
       return;
     }
 
@@ -381,6 +499,7 @@ export default class LibraryScene extends Phaser.Scene {
 
   update() {
     this.customers.update();
+    this.spirit?.update();
     if (this.isBusy()) {
       this.player.stop();
       if (this.ui.isChoiceOpen()) this.setAction(null);

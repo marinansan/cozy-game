@@ -545,7 +545,9 @@ export default class TownScene extends Phaser.Scene {
     this.setAction(clue ? '✋ Recoger' : null, () => clue && this.pickUp(clue));
 
     if (this.ui.isBubbleOpen()) this.ui.showHint(null);
-    else if (CLUES.some((c) => !state.inventory.includes(c.id))) {
+    else if (state.spirits.okiku === 'escuchado' && !state.inventory.includes('farolillo')) {
+      this.ui.showHint('El espíritu buscaba algo pequeño de papel que daba luz… ¿junto a la niebla?');
+    } else if (CLUES.some((c) => !state.inventory.includes(c.id))) {
       this.ui.showHint('Explora el barrio… quizá haya algo junto a la niebla');
     } else {
       this.ui.showHint('Vuelve a la puerta de la librería cuando quieras');

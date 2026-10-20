@@ -140,6 +140,7 @@ export const CLUES = [
   {
     id: 'farolillo',
     nombre: 'Farolillo de papel apagado',
+    icono: '🏮',
     x: 1192,
     y: 745,
     texto: [

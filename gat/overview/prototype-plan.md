@@ -45,7 +45,7 @@ Comprobar que el corazón del juego funciona y resulta relajante: **un día comp
 - Un objeto-pista escondido en la calle que se puede recoger.
 - ✅ *Se ve:* exploración y recogida de un objeto.
 
-### Paso 5. El primer espíritu
+### Paso 5. El primer espíritu ✔️ (hecho: la señora Okiku y el farolillo)
 - De noche llega un espíritu (forma translúcida con brillo ámbar) y cuenta su recuerdo en fragmentos.
 - Al día siguiente buscas la pista y, de noche, le ofreces la bebida y el objeto.
 - Si te equivocas, te da otra pista. Si aciertas, se despide.

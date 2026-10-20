@@ -213,8 +213,9 @@ export default class CafeUI {
   }
 
   // Abre el panel de atención con los pasos que necesite el cliente
-  // (bebida, comida y/o libro). Al terminar llama a onDone({ bebida, comida, libro }).
-  openServe(customer, onDone) {
+  // (bebida, comida, libro y/o objeto). Al terminar llama a onDone({ bebida, comida, libro, objeto }).
+  // options.objetos: objetos encontrados que se pueden ofrecer [{ id, nombre, icono }]
+  openServe(customer, onDone, options = {}) {
     this.panel = this.add('div', 'fondo-panel interactivo');
     const card = this.add('div', 'panel', this.panel);
     const served = {};
@@ -239,6 +240,14 @@ export default class CafeUI {
       steps.push((next) =>
         this.showBookStep(card, customer, (book) => {
           served.libro = book;
+          next();
+        }),
+      );
+    }
+    if (customer.pide.objeto) {
+      steps.push((next) =>
+        this.showObjectStep(card, customer, options.objetos ?? [], (objeto) => {
+          served.objeto = objeto;
           next();
         }),
       );
@@ -310,6 +319,20 @@ export default class CafeUI {
       option.innerHTML = `<span class="icono">${food.icono}</span>${food.nombre}`;
       option.onclick = () => next(food.id);
     }
+  }
+
+  // Elegir uno de los objetos encontrados (o ninguno, si aún no tienes nada)
+  showObjectStep(card, customer, objetos, next) {
+    this.header(card, '🏮 Ofrece un objeto', customer);
+    const options = this.add('div', 'opciones', card);
+    for (const objeto of objetos) {
+      const option = this.add('button', 'opcion', options);
+      option.innerHTML = `<span class="icono">${objeto.icono}</span>${objeto.nombre}`;
+      option.onclick = () => next(objeto.id);
+    }
+    const none = this.add('button', 'opcion', options);
+    none.innerHTML = '<span class="icono">🤲</span>Aún no he encontrado nada';
+    none.onclick = () => next(null);
   }
 
   showBookStep(card, customer, next) {
