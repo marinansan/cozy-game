@@ -79,6 +79,8 @@ export default class TownScene extends Phaser.Scene {
   }
 
   preload() {
+    this.load.image('sueloHierba', 'assets/suelo-hierba.png');
+    this.load.image('sueloBosque', 'assets/suelo-bosque.png');
     for (const b of BUILDINGS) {
       if (b.imagen) this.load.image(`edificio-${b.id}`, `assets/${b.imagen.archivo}`);
     }
@@ -239,15 +241,10 @@ export default class TownScene extends Phaser.Scene {
       for (const p of points) g.fillCircle(p.x, p.y, radius);
     };
 
-    g.fillStyle(COLORS.hierba).fillRect(0, 0, width, height);
-    // Manchas de hierba más oscura para que el suelo no sea plano
     const rng = new Phaser.Math.RandomDataGenerator(['pueblo']);
-    g.fillStyle(COLORS.hierbaOscura, 0.5);
-    for (let i = 0; i < 380; i++) g.fillCircle(rng.between(0, width), rng.between(0, height), rng.between(6, 18));
+    this.paintGroundTextures();
 
-    // La montaña: todo lo que queda al norte de su pie, con claros y una pared de tierra
-    g.fillStyle(COLORS.montana).fillPoints([{ x: 0, y: 0 }, { x: width, y: 0 }, ...[...this.mountainFoot].reverse()], true);
-    for (const c of MOUNTAIN.claros) g.fillStyle(COLORS.claro).fillRoundedRect(c.x, c.y, c.w, c.h, 14);
+    // El pie de la montaña: una pared de tierra
     band(this.mountainFoot, COLORS.acantilado, 11);
     for (const p of this.mountainFoot.filter((_, i) => i % 6 === 0)) line(0x8f5a30, 2, p.x, p.y - 7, p.x, p.y + 7);
 
@@ -318,11 +315,36 @@ export default class TownScene extends Phaser.Scene {
     // Suelo del cementerio
     fillRect(COLORS.cementerio, CEMETERY);
 
-    this.ground = this.add.renderTexture(0, 0, width, height).setOrigin(0).setDepth(-10);
     this.ground.draw(g);
     g.destroy();
 
     this.addLabel(PLOTS[0].x + PLOTS[0].w / 2, PLOTS[0].y + PLOTS[0].h / 2 + 5, 0, PLOTS[0].nombre);
+  }
+
+  // Las texturas del suelo (pixel art que se repite): hierba en el pueblo y suelo de bosque
+  // en la montaña, en los bordes y al otro lado de la vía. Se pintan una sola vez.
+  paintGroundTextures() {
+    const { width, height } = TOWN_SIZE;
+    for (const key of ['sueloHierba', 'sueloBosque']) this.textures.get(key).setFilter(Phaser.Textures.FilterMode.NEAREST);
+    this.ground = this.add.renderTexture(0, 0, width, height).setOrigin(0).setDepth(-10);
+    this.ground.texture.setFilter(Phaser.Textures.FilterMode.NEAREST); // píxeles nítidos al acercar la cámara
+    const tiled = (key, x, y, w, h) => this.make.tileSprite({ x, y, width: w, height: h, key, add: false }).setOrigin(0).setTilePosition(x, y);
+
+    // Primero todo de bosque; después se recorta la parte del pueblo y se pinta de hierba
+    const forest = tiled('sueloBosque', 0, 0, width, height);
+    const grass = this.make.renderTexture({ x: 0, y: 0, width, height }, false).setOrigin(0);
+    grass.draw(tiled('sueloHierba', 0, 0, width, height));
+    // Lo que no es pueblo se borra de la capa de hierba
+    const outside = this.make.graphics({ add: false });
+    outside.fillStyle(0xffffff).fillPoints([{ x: 0, y: 0 }, { x: width, y: 0 }, ...[...this.mountainFoot].reverse()], true);
+    outside.fillPoints([...this.railPoints, { x: width, y: height }, { x: 0, y: height }], true);
+    for (const f of FOREST) outside.fillRect(f.x, f.y, f.w, f.h);
+    grass.erase(outside);
+    // …y en los claros de la montaña vuelve a haber hierba
+    for (const c of MOUNTAIN.claros) grass.draw(tiled('sueloHierba', c.x, c.y, c.w, c.h));
+
+    this.ground.draw([forest, grass]);
+    for (const obj of [forest, grass, outside]) obj.destroy();
   }
 
   // Lo que no se puede pisar del suelo: la montaña (salvo los claros y las escaleras),
@@ -722,7 +744,7 @@ export default class TownScene extends Phaser.Scene {
       Phaser.Display.Color.ValueToColor(0xffffff),
       Phaser.Display.Color.ValueToColor(phase.tinte),
       100,
-      phase.fuerza * 100,
+      (phase.fuerzaExterior ?? phase.fuerza) * 100,
     );
     this.add
       .rectangle(0, 0, TOWN_SIZE.width, TOWN_SIZE.height, Phaser.Display.Color.GetColor(color.r, color.g, color.b))
