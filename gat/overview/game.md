@@ -32,8 +32,7 @@ Juego *cozy* de gestión, exploración y construcción. Heredas la librería-caf
 
 ## 4. Perspectiva y arte
 
-- **Exteriores (el barrio): perspectiva isométrica 2:1**, en diagonal como un diorama (referencia: reinterpretaciones isométricas de Stardew Valley). El juego calcula en un plano normal y solo lo dibuja en diagonal (`src/systems/iso.js`).
-- **Interiores (librería y otros lugares): vista cenital en 3/4**, como la librería actual.
+- **Exteriores (el pueblo) e interiores: vista cenital en 3/4**, como Stardew Valley: el suelo se ve desde arriba, con calles rectas, y los edificios muestran su fachada y el tejado. (Antes el pueblo era isométrico; se cambió para que todo el juego tenga la misma vista.)
 - **De lejos:** botón de mapa que muestra el pueblo entero: estación en el centro, vía del tren, río con puentes, santuario con escaleras al norte, bosque alrededor y niebla sobre las zonas que aún no se recuerdan. Distribución en `src/data/townLayout.js` (boceto en `gat/overview/mapa-boceto.png`).
 - **Pixel art "suave":** contornos suaves, paletas armónicas poco saturadas, luz ambiental. Ver `gat/narrative/world.md` §7.
 - **Arte inicial:** imágenes generadas con ChatGPT y limpiadas con `tools/clean_art.py` (cuadrícula real de píxeles y colores limitados). Personaje provisional con formas.

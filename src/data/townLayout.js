@@ -2,9 +2,8 @@
 // Basada en el boceto gat/overview/mapa-boceto.png.
 //
 // Todas las medidas son del "plano": x hacia la derecha (este), y hacia abajo (sur).
-// El juego lo dibuja girado en diagonal (perspectiva isométrica, ver src/systems/iso.js).
-// Recuerda: las fachadas que se ven son las del sur (y mayor) y las del este (x mayor),
-// por eso las puertas de los edificios dan al sur, hacia la calle.
+// Vista cenital 3/4: el plano se dibuja tal cual, con el norte arriba. De los edificios
+// se ve la fachada sur, por eso sus puertas dan al sur, hacia la calle.
 
 export const TOWN_SIZE = { width: 1680, height: 1200 };
 
@@ -80,10 +79,8 @@ export const PATHS = [
   // De la calle del norte al puente de madera y al pie de las escaleras del santuario
   [
     { x: 960, y: 580 },
-    { x: 968, y: 500 },
-    { x: 945, y: 458 },
-    { x: 880, y: 448 },
-    { x: 845, y: 430 },
+    { x: 960, y: 470 },
+    { x: 840, y: 462 },
     { x: 840, y: 310 },
   ],
   // Orilla norte del río: del puente de madera al taller de Okiku
@@ -170,10 +167,11 @@ export const GREAT_TREE = { x: 1010, y: 120 };
 // Edificios: x, y, ancho, alto = la planta (lo que choca); tejado = altura del tejado por encima.
 // La puerta está en la fachada sur. Si pasas por detrás, el edificio te tapa.
 //
-// imagen (opcional): dibujo del edificio en lugar de la caja de colores.
-// - archivo: en public/assets/
-// - origen: punto de la imagen (de 0 a 1) que coincide con la esquina delantera de la base
-//   (la de abajo del rombo); así la imagen queda bien apoyada sobre el suelo.
+// imagen (opcional): dibujo del edificio en lugar de la caja de colores, en vista 3/4.
+// - archivo: en public/assets/ (dibujado a 3 veces la resolución del juego)
+// - origen: punto de la imagen (de 0 a 1) que coincide con el centro del borde sur de la planta
+//   (el pie de la fachada); así la imagen queda bien apoyada sobre el suelo.
+//   Ejemplo: imagen: { archivo: 'libreria-exterior.png', origen: { x: 0.5, y: 0.95 } }
 export const BUILDINGS = [
   // Zona 0
   {
@@ -186,9 +184,9 @@ export const BUILDINGS = [
     tejado: 50,
     pared: 0xc9a27a,
     techo: 0x4a3b5c,
-    imagen: { archivo: 'libreria-exterior.png', origen: { x: 0.4608, y: 0.8102 } },
+    // El dibujo anterior (libreria-exterior.png) era isométrico: falta uno nuevo en vista 3/4
   },
-  { id: 'estacion', nombre: 'Estación', x: 744, y: 470, w: 192, h: 90, tejado: 30, pared: 0xd9b37a, techo: 0x6b4a3a },
+  { id: 'estacion', nombre: 'Estación', x: 744, y: 505, w: 192, h: 55, tejado: 30, pared: 0xd9b37a, techo: 0x6b4a3a },
   { id: 'ultramarinos', nombre: 'Ultramarinos', x: 1000, y: 690, w: 70, h: 60, tejado: 34, pared: 0xc4a07a, techo: 0x56463f },
   { id: 'casa0', nombre: 'Casa', x: 590, y: 696, w: 64, h: 54, tejado: 32, pared: 0xb89a7a, techo: 0x5a4a4a },
   // Zona 1

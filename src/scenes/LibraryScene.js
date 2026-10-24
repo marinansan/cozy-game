@@ -364,22 +364,25 @@ export default class LibraryScene extends Phaser.Scene {
     this.spirit = null;
   }
 
-  // Escuchar: la primera noche cuenta lo que recuerda y se desvanece;
-  // las siguientes pregunta si has encontrado algo
+  // Escuchar: la primera noche cuenta lo que recuerda y se desvanece, salvo que ya lleves
+  // su objeto (lo has encontrado esa tarde): entonces lo nota y se queda a esperar.
+  // Las noches siguientes pregunta si has encontrado algo.
   talkToSpirit() {
     const spirit = this.spirit;
     const data = spirit.data;
     const firstVisit = state.spirits[data.id] !== 'escuchado';
+    const hasObject = state.inventory.includes(data.pide.objeto);
     this.player.stop();
     spirit.state = 'talking';
     spirit.showAlert(false);
-    const pages = firstVisit ? data.primeraVisita : data.regreso;
+    let pages = data.regreso;
+    if (firstVisit) pages = hasObject ? [...data.primeraVisita, ...data.loNotas] : data.primeraVisita;
     this.ui.showBubble(spirit.x, spirit.y + BUBBLE_OFFSET, data.nombre, pages, () => {
-      if (!firstVisit) {
+      if (firstVisit) state.spirits[data.id] = 'escuchado';
+      if (!firstVisit || hasObject) {
         spirit.state = 'waitingServe';
         return;
       }
-      state.spirits[data.id] = 'escuchado';
       spirit.state = 'leaving';
       this.time.delayedCall(1500, () => {
         this.ui.hideBubble();

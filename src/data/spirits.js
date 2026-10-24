@@ -5,6 +5,7 @@
 // - nombreReal: el nombre que recuerda al final
 // - primeraVisita: lo que cuenta la primera noche (después se desvanece)
 // - regreso: lo que dice las noches siguientes, antes de que le ofrezcas algo
+// - loNotas: si ya llevas su objeto la primera noche, lo nota y se queda a esperar tu ofrenda
 // - pide.bebida: ingredientes que debe llevar y los que no le gustan
 // - pide.objeto: id del objeto que hay que encontrar en el barrio (ver CLUES en townLayout.js)
 // - pistaBebida / pistaObjeto: lo que dice si no aciertas, para ayudarte
@@ -26,6 +27,7 @@ export const SPIRITS = [
       'Quizá… si lo encuentras… pueda recordar quién soy.',
     ],
     regreso: ['Has vuelto a abrir…', '¿Has encontrado algo que me ayude a recordar?'],
+    loNotas: ['…Espera. Llevas algo contigo… huele a lavanda.', '¿Me lo enseñas? Me quedaré aquí un ratito.'],
     pide: {
       bebida: { quiere: ['te', 'miel'], evita: ['cafe', 'hielo'] },
       objeto: 'farolillo',
