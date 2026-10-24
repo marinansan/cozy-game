@@ -2,20 +2,23 @@ import Phaser from 'phaser';
 import {
   BRIDGES,
   BUILDINGS,
+  CEMETERY,
   CLUES,
   COLORS,
-  CROSSINGS,
-  FIELDS,
   FOREST,
+  GARDENS,
   GREAT_TREE,
   LANTERNS,
   LIBRARY_DOOR,
-  LOTS,
+  MOUNTAIN,
   PATHS,
   PATH_WIDTH,
+  PLOTS,
+  POND,
   PROPS,
   RAILWAY,
   RIVER,
+  SCHOOL_YARD,
   STAIRS,
   TOWN_SIZE,
   TOWN_START,
@@ -34,18 +37,42 @@ const FADE_TIME = 600;
 const PICKUP_REACH = 22; // distancia para recoger un objeto
 const QUESTION_OFFSET = 26;
 const BUBBLE_OFFSET = 6;
-const FOG_DEPTH = 5000; // la niebla se dibuja por encima de todo el barrio
+const FOG_DEPTH = 5000; // la niebla se dibuja por encima de todo el pueblo
 const LIGHT_DEPTH = 8600; // el brillo de los farolillos, por encima de la luz de la tarde
-const FOREST_COLOR = 0x4f6b38; // fuera del barrio solo hay bosque
+const FOREST_COLOR = 0x4f6b38; // fuera del pueblo solo hay bosque
 const LANTERN_LIGHT = 0xffc46b;
+const FOG_CELL = 20; // la niebla bloquea el paso en casillas de este tamaño
 
-// El barrio por la tarde, en vista cenital 3/4 (como la librería y Stardew Valley):
+// Curva suave que pasa por una lista de puntos [x, y], como lista de puntos { x, y }
+const curve = (points, step = 4) => {
+  const spline = new Phaser.Curves.Spline(points.flat());
+  return spline.getSpacedPoints(Math.ceil(spline.getLength() / step));
+};
+
+// Altura (y) de una curva en una x dada, sabiendo que la curva va de oeste a este
+const yAt = (points, x) => {
+  const i = points.findIndex((p) => p.x >= x);
+  if (i <= 0) return points[i === 0 ? 0 : points.length - 1].y;
+  const a = points[i - 1];
+  const b = points[i];
+  return a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x || 1);
+};
+
+// Distancia de un punto a un segmento
+const distanceToSegment = (p, a, b) => {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const t = Phaser.Math.Clamp(((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1), 0, 1);
+  return Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy));
+};
+
+// El pueblo por la tarde, en vista cenital 3/4 (como la librería y Stardew Valley):
 // el suelo se ve desde arriba y los edificios muestran su fachada sur y el tejado.
 // Por ahora casi todo son bloques de colores provisionales.
 //
 // El pueblo está dividido en zonas (src/data/townLayout.js). Las zonas cerradas están
 // cubiertas de niebla; al recuperar su recuerdo, la niebla se retira con una animación
-// la próxima vez que sales al barrio, y se enciende un farolillo de las escaleras.
+// la próxima vez que sales, y se enciende un farolillo del camino del festival.
 export default class TownScene extends Phaser.Scene {
   constructor() {
     super('TownScene');
@@ -66,18 +93,26 @@ export default class TownScene extends Phaser.Scene {
 
     // Una zona está abierta desde el principio o cuando se ha recuperado su recuerdo.
     // Si se acaba de abrir, todavía tiene niebla: se retira con la animación al entrar.
-    this.zones = ZONES.map((zone) => ({
-      ...zone,
-      open: Boolean(zone.abierta) || state.spirits[zone.abre] === 'resuelto',
-      hidden: [], // cosas que no se ven hasta que se retira la niebla (los carteles)
-    }));
+    this.zones = ZONES.map((zone) => {
+      const polygon = new Phaser.Geom.Polygon(zone.puntos.flat());
+      return {
+        ...zone,
+        polygon,
+        bounds: Phaser.Geom.Polygon.GetAABB(polygon),
+        open: Boolean(zone.abierta) || state.spirits[zone.abre] === 'resuelto',
+        hidden: [], // cosas que no se ven hasta que se retira la niebla (los carteles)
+      };
+    });
     for (const zone of this.zones) zone.foggy = !zone.open || (!zone.abierta && !state.revealedZones.includes(zone.id));
 
-    this.createRiverPath();
+    this.mountainFoot = curve(MOUNTAIN.pie);
+    this.riverPoints = curve(RIVER.puntos);
+    this.railPoints = curve(RAILWAY.puntos);
+
     this.drawGround();
     this.createGroundObstacles();
     this.createBuildings();
-    this.createLots();
+    this.createCemetery();
     this.createProps();
     this.createShrine();
     this.createTrees();
@@ -88,8 +123,8 @@ export default class TownScene extends Phaser.Scene {
     this.physics.add.collider(this.player.body, this.obstacles);
     this.buildPathfinder();
 
-    // Cámara: sigue al personaje sin salirse del barrio
-    this.cameras.main.setBounds(0, 0, TOWN_SIZE.width, TOWN_SIZE.height);
+    // Cámara: sigue al personaje sin salirse del pueblo
+    this.cameras.main.setBounds(0, 0, width, height);
     this.cameras.main.setZoom(ZOOM);
     this.cameras.main.setBackgroundColor(FOREST_COLOR);
     this.cameras.main.startFollow(this.player.sprite, true, 0.12, 0.12);
@@ -123,7 +158,7 @@ export default class TownScene extends Phaser.Scene {
     });
   }
 
-  // ---------- Dibujo del barrio (provisional) ----------
+  // ---------- Ayudas ----------
 
   // Las cuatro esquinas de un rectángulo, "raise" píxeles más arriba (para tejados, asientos…)
   corners(x, y, w, h, raise = 0) {
@@ -140,7 +175,7 @@ export default class TownScene extends Phaser.Scene {
     rect.zone = this.add.zone(x + w / 2, y + h / 2, w, h);
     this.obstacleRects.push(rect);
     this.obstacles.add(rect.zone);
-    this.debugGraphics.fillStyle(0xff3366, 0.35).fillPoints(this.corners(x, y, w, h), true);
+    this.debugGraphics.fillStyle(0xff3366, 0.35).fillRect(x, y, w, h);
     return rect;
   }
 
@@ -150,132 +185,179 @@ export default class TownScene extends Phaser.Scene {
   }
 
   zoneAt(x, y) {
-    return this.zones.find((z) => x >= z.x && x < z.x + z.w && y >= z.y && y < z.y + z.h);
+    return this.zones.find((z) => Phaser.Geom.Polygon.Contains(z.polygon, x, y));
   }
 
-  // El río es una curva suave; para saber por dónde pasa en cada punto se guarda
-  // una lista de puntos de su centro, ordenados de oeste a este
-  createRiverPath() {
-    const curve = new Phaser.Curves.Spline(RIVER.puntos.map((p) => [p.x, p.y]).flat());
-    this.riverPoints = curve.getSpacedPoints(Math.ceil(curve.getLength() / 4));
+  // Bloquea las casillas de una forma (la charca, la niebla de una zona…). Las casillas
+  // seguidas de una misma fila se juntan en un solo obstáculo.
+  blockShape(contains, bounds, cell) {
+    const rects = [];
+    for (let y = Math.floor(bounds.y / cell) * cell; y < bounds.bottom; y += cell) {
+      let runStart = null;
+      for (let x = Math.floor(bounds.x / cell) * cell; x <= bounds.right + cell; x += cell) {
+        const inside = x <= bounds.right && contains(x + cell / 2, y + cell / 2);
+        if (inside && runStart === null) runStart = x;
+        if (!inside && runStart !== null) {
+          rects.push(this.addObstacle(runStart, y, x - runStart, cell));
+          runStart = null;
+        }
+      }
+    }
+    return rects;
   }
 
-  riverYAt(x) {
-    const points = this.riverPoints;
-    const i = points.findIndex((p) => p.x >= x);
-    if (i <= 0) return points[i === 0 ? 0 : points.length - 1].y;
-    const a = points[i - 1];
-    const b = points[i];
-    return a.y + ((b.y - a.y) * (x - a.x)) / (b.x - a.x || 1);
+  isInClearing(x, y, margin = 0) {
+    return [...MOUNTAIN.claros, STAIRS].some(
+      (c) => x >= c.x - margin && x <= c.x + c.w + margin && y >= c.y - margin && y <= c.y + c.h + margin,
+    );
   }
 
-  // El suelo (hierba, caminos, río, vía, campos) se dibuja una sola vez y se guarda
-  // como imagen, para que el juego no tenga que redibujarlo en cada fotograma
+  // Puntos del paseo de una orilla (side = -1 norte, 1 sur), desde que el río sale de la montaña
+  walkwayPoints(side) {
+    const pts = this.riverPoints;
+    return pts
+      .map((p, i) => {
+        const a = pts[Math.max(0, i - 1)];
+        const b = pts[Math.min(pts.length - 1, i + 1)];
+        const len = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+        return { x: p.x - ((b.y - a.y) / len) * RIVER.paseo * side, y: p.y + ((b.x - a.x) / len) * RIVER.paseo * side };
+      })
+      .filter((p) => p.y > yAt(this.mountainFoot, p.x) + 30);
+  }
+
+  // ---------- Dibujo del pueblo (provisional) ----------
+
+  // El suelo se dibuja una sola vez y se guarda como imagen,
+  // para que el juego no tenga que redibujarlo en cada fotograma
   drawGround() {
     const { width, height } = TOWN_SIZE;
     const g = this.make.graphics({ add: false });
-    const fillRect = (color, x, y, w, h, alpha = 1) => g.fillStyle(color, alpha).fillPoints(this.corners(x, y, w, h), true);
+    const fillRect = (color, r, alpha = 1) => g.fillStyle(color, alpha).fillRect(r.x, r.y, r.w, r.h);
     const line = (color, thickness, x1, y1, x2, y2, alpha = 1) => g.lineStyle(thickness, color, alpha).lineBetween(x1, y1, x2, y2);
-    const blob = (x, y, radius) => g.fillCircle(x, y, radius);
+    const band = (points, color, radius) => {
+      g.fillStyle(color);
+      for (const p of points) g.fillCircle(p.x, p.y, radius);
+    };
 
-    fillRect(COLORS.hierba, 0, 0, width, height);
-    // La colina del santuario, algo más verde
-    const shrine = ZONES.find((z) => z.id === 5);
-    fillRect(COLORS.colina, shrine.x, 0, shrine.w, shrine.y + shrine.h);
-
+    g.fillStyle(COLORS.hierba).fillRect(0, 0, width, height);
     // Manchas de hierba más oscura para que el suelo no sea plano
-    const rng = new Phaser.Math.RandomDataGenerator(['barrio']);
+    const rng = new Phaser.Math.RandomDataGenerator(['pueblo']);
     g.fillStyle(COLORS.hierbaOscura, 0.5);
-    for (let i = 0; i < 420; i++) blob(rng.between(0, width), rng.between(0, height), rng.between(6, 18));
+    for (let i = 0; i < 380; i++) g.fillCircle(rng.between(0, width), rng.between(0, height), rng.between(6, 18));
 
-    // Arrozales (con surcos de agua) y huertos (con hileras de plantas)
-    for (const f of FIELDS) {
-      const rice = f.tipo === 'arrozal';
-      fillRect(COLORS.bordeCamino, f.x - 3, f.y - 3, f.w + 6, f.h + 6);
-      fillRect(rice ? COLORS.arrozal : COLORS.huerto, f.x, f.y, f.w, f.h);
-      for (let y = f.y + 8; y < f.y + f.h - 4; y += rice ? 10 : 12) {
-        line(rice ? 0x7fae78 : 0x6f9a4a, rice ? 1 : 3, f.x + 4, y, f.x + f.w - 4, y, 0.9);
+    // La montaña: todo lo que queda al norte de su pie, con claros y una pared de tierra
+    g.fillStyle(COLORS.montana).fillPoints([{ x: 0, y: 0 }, { x: width, y: 0 }, ...[...this.mountainFoot].reverse()], true);
+    for (const c of MOUNTAIN.claros) g.fillStyle(COLORS.claro).fillRoundedRect(c.x, c.y, c.w, c.h, 14);
+    band(this.mountainFoot, COLORS.acantilado, 11);
+    for (const p of this.mountainFoot.filter((_, i) => i % 6 === 0)) line(0x8f5a30, 2, p.x, p.y - 7, p.x, p.y + 7);
+
+    // Cultivos, huertos y jardines
+    for (const plot of PLOTS) {
+      fillRect(COLORS.bordeCamino, { x: plot.x - 3, y: plot.y - 3, w: plot.w + 6, h: plot.h + 6 });
+      fillRect(plot.tipo === 'cultivo' ? COLORS.cultivo : COLORS.tierra, plot);
+      for (let y = plot.y + 8; y < plot.y + plot.h - 4; y += 10) line(plot.tipo === 'cultivo' ? 0x6f9a4a : 0x6b4f2a, 2, plot.x + 4, y, plot.x + plot.w - 4, y, 0.8);
+    }
+    for (const garden of GARDENS) {
+      fillRect(COLORS.jardin, garden);
+      for (let i = 0; i < 6; i++) {
+        g.fillStyle(rng.pick([0xf4c6d0, 0xf2d38a, 0xffffff])).fillCircle(garden.x + 5 + i * 5, garden.y + 8 + (i % 2) * 11, 2);
       }
     }
+    fillRect(COLORS.patio, SCHOOL_YARD);
 
-    // El río: una orilla de hierba oscura y el agua encima, con algún reflejo
-    const half = RIVER.ancho / 2;
-    g.fillStyle(COLORS.orilla);
-    for (const p of this.riverPoints) blob(p.x, p.y, half + 6);
-    g.fillStyle(COLORS.agua);
-    for (const p of this.riverPoints) blob(p.x, p.y, half);
+    // La charca, con su orilla
+    const pondCurve = curve([...POND.puntos, POND.puntos[0]], 6);
+    band(pondCurve, COLORS.muro, 8);
+    g.fillStyle(COLORS.agua).fillPoints(pondCurve, true);
+    this.pond = new Phaser.Geom.Polygon(pondCurve);
+
+    // El río: muros de piedra, el agua y algún reflejo; y un paseo en cada orilla
+    const walkways = [this.walkwayPoints(-1), this.walkwayPoints(1)];
+    for (const side of walkways) band(side, COLORS.paseo, RIVER.anchoPaseo / 2);
+    band(this.riverPoints, COLORS.muro, RIVER.muro / 2);
+    band(this.riverPoints, COLORS.agua, RIVER.ancho / 2);
     g.fillStyle(0xffffff, 0.25);
-    this.riverPoints.forEach((p, i) => i % 9 === 0 && blob(p.x + 6, p.y + ((i * 7) % 20) - 10, 3));
+    this.riverPoints.forEach((p, i) => i % 9 === 0 && g.fillCircle(p.x + 6, p.y + ((i * 7) % 20) - 10, 3));
+    // Cascada: donde el río cae desde la montaña
+    const fall = this.riverPoints.find((p) => p.y >= yAt(this.mountainFoot, p.x) - 6);
+    g.fillStyle(0xe2f2f5).fillRect(fall.x - 22, fall.y - 26, 44, 34);
 
     // Caminos: un borde algo más oscuro y el camino encima
     for (const [color, extra] of [
-      [COLORS.bordeCamino, 4],
+      [COLORS.bordeCamino, 3],
       [COLORS.camino, 0],
     ]) {
-      g.fillStyle(color);
-      for (const points of PATHS) {
-        const curve = new Phaser.Curves.Spline(points.map((p) => [p.x, p.y]).flat());
-        for (const p of curve.getSpacedPoints(Math.ceil(curve.getLength() / 4))) blob(p.x, p.y, PATH_WIDTH / 2 + extra);
-      }
+      for (const path of PATHS) band(curve(path), color, PATH_WIDTH / 2 + extra);
     }
 
     // La vía del tren: lecho de piedras, traviesas y dos raíles
-    const top = RAILWAY.y - RAILWAY.alto / 2;
-    fillRect(COLORS.piedra, 0, top, width, RAILWAY.alto);
-    for (let x = 2; x < width; x += 10) fillRect(COLORS.traviesa, x, top + 3, 4, RAILWAY.alto - 6);
-    line(COLORS.via, 2, 0, top + 9, width, top + 9);
-    line(COLORS.via, 2, 0, top + RAILWAY.alto - 9, width, top + RAILWAY.alto - 9);
-    // Pasos a nivel: tablones sobre la vía con franjas blancas en los bordes
-    for (const c of CROSSINGS) {
-      fillRect(COLORS.camino, c.x, top, c.w, RAILWAY.alto);
-      for (let y = top + 2; y < top + RAILWAY.alto; y += 6) line(COLORS.bordeCamino, 1, c.x, y, c.x + c.w, y);
-      for (let y = top; y < top + RAILWAY.alto; y += 8) {
-        fillRect(0xf4f1ec, c.x - 2, y, 4, 4);
-        fillRect(0xf4f1ec, c.x + c.w - 2, y, 4, 4);
-      }
-    }
+    const half = RAILWAY.ancho / 2;
+    band(this.railPoints, COLORS.piedra, half);
+    for (const p of this.railPoints.filter((_, i) => i % 3 === 0)) g.fillStyle(COLORS.traviesa).fillRect(p.x - 2, p.y - half + 3, 4, RAILWAY.ancho - 6);
+    for (const offset of [-7, 7]) band(this.railPoints.map((p) => ({ x: p.x, y: p.y + offset })), COLORS.via, 1.2);
 
-    // Puentes: tablones de madera o losas de piedra, con barandilla a los lados
-    for (const b of BRIDGES) {
-      const wood = b.material === 'madera';
-      fillRect(wood ? COLORS.madera : COLORS.piedra, b.x, b.y, b.w, b.h);
-      for (let y = b.y + 4; y < b.y + b.h; y += wood ? 6 : 12) line(wood ? 0x7a5234 : 0x9a948a, 1, b.x, y, b.x + b.w, y);
-      line(wood ? 0x6b4a2f : 0x8a847a, 3, b.x + 2, b.y, b.x + 2, b.y + b.h);
-      line(wood ? 0x6b4a2f : 0x8a847a, 3, b.x + b.w - 2, b.y, b.x + b.w - 2, b.y + b.h);
+    // Puentes de un paseo al otro: tablones o losas, con barandilla a los lados
+    for (const bridge of BRIDGES) {
+      const [ax, ay] = bridge.desde;
+      const [bx, by] = bridge.hasta;
+      const color = { madera: COLORS.madera, piedra: COLORS.piedra, rojo: COLORS.rojo }[bridge.material];
+      line(color, 26, ax, ay, bx, by);
+      const len = Math.hypot(bx - ax, by - ay);
+      const nx = (-(by - ay) / len) * 13;
+      const ny = ((bx - ax) / len) * 13;
+      const rail = bridge.material === 'piedra' ? 0x8a847a : 0x5a3f2c;
+      line(rail, 3, ax + nx, ay + ny, bx + nx, by + ny);
+      line(rail, 3, ax - nx, ay - ny, bx - nx, by - ny);
     }
 
     // Escaleras del santuario: escalones de piedra subiendo hacia el norte
-    fillRect(0x9a948a, STAIRS.x - 3, STAIRS.y, STAIRS.w + 6, STAIRS.h);
-    fillRect(COLORS.piedra, STAIRS.x, STAIRS.y, STAIRS.w, STAIRS.h);
+    fillRect(0x9a948a, { x: STAIRS.x - 3, y: STAIRS.y, w: STAIRS.w + 6, h: STAIRS.h });
+    fillRect(COLORS.piedra, STAIRS);
     for (let y = STAIRS.y + 6; y < STAIRS.y + STAIRS.h; y += 7) line(0x8a847a, 1, STAIRS.x, y, STAIRS.x + STAIRS.w, y);
 
-    // Tierra de los solares vacíos
-    for (const lot of LOTS) fillRect(COLORS.solar, lot.x, lot.y, lot.w, lot.h, 0.6);
+    // Suelo del cementerio
+    fillRect(COLORS.cementerio, CEMETERY);
 
-    this.ground = this.add.renderTexture(0, 0, TOWN_SIZE.width, TOWN_SIZE.height).setOrigin(0).setDepth(-10);
+    this.ground = this.add.renderTexture(0, 0, width, height).setOrigin(0).setDepth(-10);
     this.ground.draw(g);
     g.destroy();
+
+    this.addLabel(PLOTS[0].x + PLOTS[0].w / 2, PLOTS[0].y + PLOTS[0].h / 2 + 5, 0, PLOTS[0].nombre);
   }
 
-  // Lo que no se puede pisar del suelo: el agua (salvo los puentes), la vía (salvo los
-  // pasos a nivel), los campos y el bosque
+  // Lo que no se puede pisar del suelo: la montaña (salvo los claros y las escaleras),
+  // el agua (salvo los puentes), la charca, la vía y el bosque de los bordes
   createGroundObstacles() {
     const slice = 8;
-    const half = RIVER.ancho / 2 - 4; // se puede llegar hasta la orilla
     for (let x = 0; x < TOWN_SIZE.width; x += slice) {
-      const onBridge = BRIDGES.some((b) => x + slice > b.x && x < b.x + b.w);
-      if (!onBridge) this.addObstacle(x, this.riverYAt(x + slice / 2) - half, slice, half * 2);
+      // Montaña: desde arriba hasta su pie, menos los claros que cruzan esta columna
+      const xc = x + slice / 2;
+      let blocked = [[0, yAt(this.mountainFoot, xc) + 6]];
+      for (const c of [...MOUNTAIN.claros, STAIRS].filter((r) => xc >= r.x && xc <= r.x + r.w)) {
+        blocked = blocked.flatMap(([from, to]) =>
+          [
+            [from, Math.min(to, c.y)],
+            [Math.max(from, c.y + c.h), to],
+          ].filter(([a, b]) => b - a > 1),
+        );
+      }
+      for (const [from, to] of blocked) this.addObstacle(x, from, slice, to - from);
+
+      // La vía y todo lo que queda al sur (el bosque)
+      const railTop = yAt(this.railPoints, xc) - RAILWAY.ancho / 2;
+      this.addObstacle(x, railTop, slice, TOWN_SIZE.height - railTop);
     }
 
-    const top = RAILWAY.y - RAILWAY.alto / 2;
-    let from = 0;
-    for (const c of [...CROSSINGS].sort((a, b) => a.x - b.x)) {
-      this.addObstacle(from, top, c.x - from, RAILWAY.alto);
-      from = c.x + c.w;
-    }
-    this.addObstacle(from, top, TOWN_SIZE.width - from, RAILWAY.alto);
+    // El agua del río, en pedacitos a lo largo de su curva; los puentes quedan libres
+    const bridges = BRIDGES.map((b) => ({ a: { x: b.desde[0], y: b.desde[1] }, b: { x: b.hasta[0], y: b.hasta[1] } }));
+    const piece = RIVER.ancho - 6;
+    this.riverPoints.forEach((p, i) => {
+      if (i % 2) return;
+      if (bridges.some((br) => distanceToSegment(p, br.a, br.b) < piece / 2 + 12)) return;
+      this.addObstacle(p.x - piece / 2, p.y - piece / 2, piece, piece);
+    });
 
-    for (const f of FIELDS) this.addObstacle(f.x, f.y, f.w, f.h);
+    this.blockShape((x, y) => Phaser.Geom.Polygon.Contains(this.pond, x, y), Phaser.Geom.Polygon.GetAABB(this.pond), 10);
     for (const f of FOREST) this.addObstacle(f.x, f.y, f.w, f.h);
   }
 
@@ -285,6 +367,9 @@ export default class TownScene extends Phaser.Scene {
   createBuildings() {
     const shade = (color, amount) => Phaser.Display.Color.ValueToColor(color).darken(amount).color;
     const light = (color, amount) => Phaser.Display.Color.ValueToColor(color).lighten(amount).color;
+    const rng = new Phaser.Math.RandomDataGenerator(['casas']);
+    const walls = [0xb89a7a, 0xc4a07a, 0xa88a6a, 0xcfb48e, 0xb08f6e];
+    const roofs = [0x56463f, 0x5a4a4a, 0x4a4250, 0x6a5040, 0x4f4a3f];
 
     for (const b of BUILDINGS) {
       const front = b.y + b.h; // borde sur de la planta, donde está la puerta
@@ -299,49 +384,55 @@ export default class TownScene extends Phaser.Scene {
         continue;
       }
 
-      const wall = 30; // altura de la fachada
+      const wallColor = b.pared ?? rng.pick(walls);
+      const roofColor = b.techo ?? rng.pick(roofs);
+      const wall = b.tipo === 'casa' ? 26 : 30; // altura de la fachada
       const g = this.add.graphics().setDepth(front);
       const wallTop = front - wall;
 
       // Fachada con zócalo oscuro
-      g.fillStyle(b.pared).fillRect(b.x, wallTop, b.w, wall);
-      g.fillStyle(shade(b.pared, 18)).fillRect(b.x, front - 4, b.w, 4);
-      // Puerta en el centro y una ventana a cada lado
-      g.fillStyle(0x5b3a29).fillRect(b.x + b.w / 2 - 9, front - 22, 18, 22);
-      g.fillStyle(0xf2d38a).fillRect(b.x + 8, front - 22, 16, 10).fillRect(b.x + b.w - 24, front - 22, 16, 10);
+      g.fillStyle(wallColor).fillRect(b.x, wallTop, b.w, wall);
+      g.fillStyle(shade(wallColor, 18)).fillRect(b.x, front - 4, b.w, 4);
+      // Puerta y ventanas (encendidas si alguien vive dentro); las tiendas tienen cortina noren
+      const window = b.tipo === 'casa' && !b.habitada ? 0x6b6258 : 0xf2d38a;
+      g.fillStyle(0x5b3a29).fillRect(b.x + b.w / 2 - 8, front - 20, 16, 20);
+      if (b.tipo === 'tienda') g.fillStyle(0x3f5a8a).fillRect(b.x + b.w / 2 - 12, front - 22, 24, 8);
+      g.fillStyle(window).fillRect(b.x + 6, front - 19, 12, 9).fillRect(b.x + b.w - 18, front - 19, 12, 9);
       // Tejado visto desde arriba: dos aguas (la de delante más clara), alero y cumbrera
       const roofTop = b.y - wall;
       const roofBottom = wallTop + 5;
       const ridge = roofTop + (roofBottom - roofTop) * 0.45;
-      g.fillStyle(shade(b.techo, 8)).fillRect(b.x - 6, roofTop, b.w + 12, ridge - roofTop);
-      g.fillStyle(light(b.techo, 6)).fillRect(b.x - 6, ridge, b.w + 12, roofBottom - ridge);
-      g.fillStyle(shade(b.techo, 20)).fillRect(b.x - 6, ridge - 2, b.w + 12, 3).fillRect(b.x - 6, roofBottom - 2, b.w + 12, 2);
+      g.fillStyle(shade(roofColor, 8)).fillRect(b.x - 5, roofTop, b.w + 10, ridge - roofTop);
+      g.fillStyle(light(roofColor, 6)).fillRect(b.x - 5, ridge, b.w + 10, roofBottom - ridge);
+      g.fillStyle(shade(roofColor, 20)).fillRect(b.x - 5, ridge - 2, b.w + 10, 3).fillRect(b.x - 5, roofBottom - 2, b.w + 10, 2);
       g.fillStyle(0x000000, 0.18).fillRect(b.x, roofBottom, b.w, 4); // sombra del alero
 
-      this.addLabel(b.x + b.w / 2, b.y + b.h / 2, b.h / 2 + wall + 4, b.nombre);
+      if (b.nombre) this.addLabel(b.x + b.w / 2, b.y + b.h / 2, b.h / 2 + wall + 4, b.nombre);
       this.addObstacle(b.x, b.y, b.w, b.h);
     }
   }
 
-  // Solares vallados, con una abertura en la valla del norte
-  createLots() {
-    const t = 4;
-    for (const lot of LOTS) {
-      const g = this.add.graphics().setDepth(lot.y + lot.h / 2);
-      const gap = { from: lot.x + lot.w / 2 - lot.abertura / 2, to: lot.x + lot.w / 2 + lot.abertura / 2 };
-      const fence = (x1, y1, x2, y2) => g.lineStyle(3, COLORS.valla).lineBetween(x1, y1 - 4, x2, y2 - 4);
-      fence(lot.x, lot.y, gap.from, lot.y);
-      fence(gap.to, lot.y, lot.x + lot.w, lot.y);
-      fence(lot.x + lot.w, lot.y, lot.x + lot.w, lot.y + lot.h);
-      fence(lot.x, lot.y, lot.x, lot.y + lot.h);
-      fence(lot.x, lot.y + lot.h, lot.x + lot.w, lot.y + lot.h);
-      this.addLabel(lot.x + lot.w / 2, lot.y + lot.h / 2, 0, 'Solar vacío');
-      this.addObstacle(lot.x, lot.y - t / 2, gap.from - lot.x, t);
-      this.addObstacle(gap.to, lot.y - t / 2, lot.x + lot.w - gap.to, t);
-      this.addObstacle(lot.x - t / 2, lot.y, t, lot.h);
-      this.addObstacle(lot.x + lot.w - t / 2, lot.y, t, lot.h);
-      this.addObstacle(lot.x, lot.y + lot.h - t / 2, lot.w, t);
+  // El cementerio: un murete bajo con la entrada al sur y unas pocas lápidas
+  createCemetery() {
+    const c = CEMETERY;
+    const g = this.add.graphics().setDepth(c.y + c.h);
+    const gate = { from: c.x + c.w / 2 - 14, to: c.x + c.w / 2 + 14 };
+    g.fillStyle(0x8a847a).fillRect(c.x, c.y - 4, c.w, 4).fillRect(c.x, c.y, 4, c.h).fillRect(c.x + c.w - 4, c.y, 4, c.h);
+    g.fillRect(c.x, c.y + c.h - 4, gate.from - c.x, 4).fillRect(gate.to, c.y + c.h - 4, c.x + c.w - gate.to, 4);
+    this.addObstacle(c.x, c.y - 4, c.w, 4);
+    this.addObstacle(c.x, c.y, 4, c.h);
+    this.addObstacle(c.x + c.w - 4, c.y, 4, c.h);
+    this.addObstacle(c.x, c.y + c.h - 4, gate.from - c.x, 4);
+    this.addObstacle(gate.to, c.y + c.h - 4, c.x + c.w - gate.to, 4);
+    for (let x = c.x + 14; x < c.x + c.w - 14; x += 22) {
+      for (const y of [c.y + 22, c.y + 46]) {
+        const stone = this.add.graphics().setDepth(y);
+        stone.fillStyle(0x8a847a).fillRect(x, y - 14, 8, 14);
+        stone.fillStyle(0xa8a296).fillRect(x + 1, y - 13, 6, 3);
+        this.addObstacle(x, y - 4, 8, 4);
+      }
     }
+    this.addLabel(c.x + c.w / 2, c.y + c.h, -14, 'Cementerio');
   }
 
   createProps() {
@@ -349,59 +440,54 @@ export default class TownScene extends Phaser.Scene {
       const base = { x: p.x + p.w / 2, y: p.y + p.h / 2 };
       const g = this.add.graphics().setDepth(base.y);
       if (p.tipo === 'banco') {
-        g.fillStyle(0x6b4a2f).fillRect(base.x - 2, base.y - 6, 4, 6);
-        g.fillStyle(0x8a5a3b).fillPoints(this.corners(p.x, p.y, p.w, p.h, 6), true);
+        g.fillStyle(0x6b4a2f).fillRect(p.x + 2, p.y, 3, 8).fillRect(p.x + p.w - 5, p.y, 3, 8);
+        g.fillStyle(0x8a5a3b).fillRect(p.x, p.y - 4, p.w, 6);
       } else if (p.tipo === 'linterna') {
         g.fillStyle(0x9a9a8a).fillRect(base.x - 5, base.y - 22, 10, 22);
         g.fillStyle(0xf2d38a).fillRect(base.x - 3, base.y - 18, 6, 5);
       } else if (p.tipo === 'farola') {
         g.fillStyle(0x3d3d3d).fillRect(base.x - 2, base.y - 36, 4, 36);
         g.fillStyle(0xf2d38a).fillCircle(base.x, base.y - 38, 5);
+      } else if (p.tipo === 'molino') {
+        g.fillStyle(0x7a5a3a).fillRect(p.x, p.y + 8, p.w, p.h - 8);
+        g.lineStyle(4, 0x6b4a2f).strokeCircle(base.x, p.y + 4, 18);
+        for (let a = 0; a < Math.PI; a += Math.PI / 4) {
+          g.lineBetween(base.x - Math.cos(a) * 18, p.y + 4 - Math.sin(a) * 18, base.x + Math.cos(a) * 18, p.y + 4 + Math.sin(a) * 18);
+        }
+      } else if (p.tipo === 'columpio') {
+        g.fillStyle(0x6b4a2f).fillRect(p.x, p.y - 28, 3, 32).fillRect(p.x + p.w - 3, p.y - 28, 3, 32).fillRect(p.x, p.y - 30, p.w, 3);
+        g.lineStyle(1, 0x3d3d3d).lineBetween(p.x + 12, p.y - 28, p.x + 12, p.y - 6).lineBetween(p.x + 18, p.y - 28, p.x + 18, p.y - 6);
+        g.fillStyle(0x8a5a3b).fillRect(p.x + 10, p.y - 6, 10, 3);
       }
       this.addObstacle(p.x, p.y, p.w, p.h);
     }
-
-    // Señales de los pasos a nivel: un poste con la cruz blanca y roja
-    const top = RAILWAY.y - RAILWAY.alto / 2;
-    for (const c of CROSSINGS) {
-      for (const spot of [
-        { x: c.x - 8, y: top - 10 },
-        { x: c.x + c.w + 4, y: top + RAILWAY.alto + 6 },
-      ]) {
-        const base = { x: spot.x + 2, y: spot.y + 2 };
-        const g = this.add.graphics().setDepth(base.y);
-        g.fillStyle(0x3d3d3d).fillRect(base.x - 1, base.y - 30, 2, 30);
-        g.lineStyle(3, 0xf4f1ec).lineBetween(base.x - 7, base.y - 33, base.x + 7, base.y - 23);
-        g.lineBetween(base.x - 7, base.y - 23, base.x + 7, base.y - 33);
-        g.fillStyle(0xc0463a).fillCircle(base.x - 4, base.y - 17, 2).fillCircle(base.x + 4, base.y - 17, 2);
-        this.addObstacle(spot.x, spot.y, 4, 4);
-      }
-    }
+    // Embarcadero de la charca (se puede pisar)
+    const pier = POND.embarcadero;
+    this.add.graphics().setDepth(-5).fillStyle(COLORS.madera).fillRect(pier.x, pier.y, pier.w, pier.h);
   }
 
-  // El santuario: torii al pie de las escaleras, farolillos a los lados y el gran árbol dormido
+  // El santuario: torii al pie de las escaleras, el camino de los farolillos y el gran árbol
   createShrine() {
     // Torii: dos postes rojos y dos travesaños. Se pasa por debajo.
-    const postY = STAIRS.y + STAIRS.h + 8;
-    const left = { x: STAIRS.x - 4, y: postY };
-    const right = { x: STAIRS.x + STAIRS.w + 4, y: postY };
+    const postY = STAIRS.y + STAIRS.h + 4;
+    const left = STAIRS.x - 4;
+    const right = STAIRS.x + STAIRS.w + 4;
     const torii = this.add.graphics().setDepth(postY);
     const height = 40;
-    torii.fillStyle(0xc0463a).fillRect(left.x - 2, left.y - height, 4, height).fillRect(right.x - 2, right.y - height, 4, height);
-    torii.lineStyle(3, 0xc0463a).lineBetween(left.x - 3, left.y - height + 9, right.x + 3, right.y - height + 9);
-    torii.lineStyle(4, 0x3f3a3a).lineBetween(left.x - 8, left.y - height - 2, right.x + 8, right.y - height - 2);
-    this.addObstacle(STAIRS.x - 6, postY - 2, 4, 4);
-    this.addObstacle(STAIRS.x + STAIRS.w + 2, postY - 2, 4, 4);
+    torii.fillStyle(COLORS.rojo).fillRect(left - 2, postY - height, 4, height).fillRect(right - 2, postY - height, 4, height);
+    torii.fillRect(left - 3, postY - height + 8, right - left + 6, 3);
+    torii.fillStyle(0x3f3a3a).fillRect(left - 8, postY - height - 3, right - left + 16, 4);
+    this.addObstacle(left - 2, postY - 2, 4, 4);
+    this.addObstacle(right - 2, postY - 2, 4, 4);
 
-    // Farolillos de las escaleras: se encienden uno por cada recuerdo recuperado
+    // Farolillos del camino del festival: se enciende uno por cada recuerdo recuperado
     this.lanterns = LANTERNS.map((spot, i) => {
-      const base = spot;
-      const g = this.add.graphics().setDepth(base.y);
-      g.fillStyle(0x8a847a).fillRect(base.x - 2, base.y - 16, 4, 16);
-      g.fillStyle(0x6b4a2f).fillRect(base.x - 5, base.y - 26, 10, 2);
-      const paper = this.add.rectangle(base.x, base.y - 20, 8, 8, 0xd8ccb0).setDepth(base.y);
+      const g = this.add.graphics().setDepth(spot.y);
+      g.fillStyle(0x8a847a).fillRect(spot.x - 2, spot.y - 16, 4, 16);
+      g.fillStyle(0x6b4a2f).fillRect(spot.x - 5, spot.y - 26, 10, 2);
+      const paper = this.add.rectangle(spot.x, spot.y - 20, 8, 8, 0xd8ccb0).setDepth(spot.y);
       const glow = this.add
-        .image(base.x, base.y - 20, this.glowTexture())
+        .image(spot.x, spot.y - 20, this.glowTexture())
         .setDisplaySize(56, 56)
         .setTint(LANTERN_LIGHT)
         .setBlendMode(Phaser.BlendModes.ADD)
@@ -423,8 +509,7 @@ export default class TownScene extends Phaser.Scene {
       g.generateTexture('greatTree', 120, 140);
       g.destroy();
     }
-    const p = { x: GREAT_TREE.x, y: GREAT_TREE.y };
-    this.add.image(p.x, p.y, 'greatTree').setOrigin(0.5, 1).setDepth(p.y);
+    this.add.image(GREAT_TREE.x, GREAT_TREE.y, 'greatTree').setOrigin(0.5, 1).setDepth(GREAT_TREE.y);
     this.addObstacle(GREAT_TREE.x - 10, GREAT_TREE.y - 8, 20, 12);
     this.addLabel(GREAT_TREE.x, GREAT_TREE.y, 150, 'El gran árbol');
   }
@@ -464,131 +549,126 @@ export default class TownScene extends Phaser.Scene {
     return 'glow';
   }
 
-  // Árboles: una imagen dibujada una sola vez y reutilizada.
+  // Árboles: una imagen dibujada una sola vez y reutilizada (verde o cerezo en flor).
   // La copa queda por encima y solo el tronco choca (se puede pasar por detrás).
-  treeTexture() {
-    if (!this.textures.exists('townTree')) {
+  treeTexture(blossom = false) {
+    const key = blossom ? 'townCherry' : 'townTree';
+    if (!this.textures.exists(key)) {
       const g = this.make.graphics({ add: false });
       g.fillStyle(0x6b4a2f).fillRect(21, 46, 6, 14);
-      g.fillStyle(0x5c7f3e).fillCircle(24, 34, 18);
-      g.fillStyle(0x6f9a4a).fillCircle(19, 29, 11);
-      g.generateTexture('townTree', 48, 60);
+      g.fillStyle(blossom ? 0xe8a6b8 : 0x5c7f3e).fillCircle(24, 34, 18);
+      g.fillStyle(blossom ? 0xf6cbd6 : 0x6f9a4a).fillCircle(19, 29, 11);
+      g.generateTexture(key, 48, 60);
       g.destroy();
     }
-    return 'townTree';
+    return key;
   }
 
-  addTree(x, y, size = 1, solid = true) {
-    this.add.image(x, y, this.treeTexture()).setOrigin(0.5, 1).setScale(size).setDepth(y);
+  addTree(x, y, { size = 1, solid = true, blossom = false } = {}) {
+    this.add.image(x, y, this.treeTexture(blossom)).setOrigin(0.5, 1).setScale(size).setDepth(y);
     if (solid) this.addObstacle(x - 4, y - 4, 8, 6);
   }
 
   createTrees() {
-    for (const t of TREES) this.addTree(t.x, t.y);
+    for (const t of TREES) this.addTree(t.x, t.y, { blossom: t.cerezo });
 
-    // El bosque: árboles apretados dentro de cada zona de bosque (que ya bloquea el paso).
-    // Son cientos, así que los del interior se pintan una sola vez sobre el suelo.
-    // Los del borde que da al pueblo son árboles sueltos, para que tapen al personaje
-    // cuando pasa por detrás de ellos.
+    // El bosque de la montaña, de los bordes y del otro lado de la vía.
+    // Son cientos de árboles, así que los del interior se pintan una sola vez sobre el suelo;
+    // los del borde que da al pueblo son árboles sueltos, para que tapen al personaje.
     const rng = new Phaser.Math.RandomDataGenerator(['bosque']);
     const step = 34;
-    const edge = 44;
-    const { width, height } = TOWN_SIZE;
     const baked = [];
-    for (const f of FOREST) {
-      for (let y = f.y + 12; y < f.y + f.h; y += step) {
-        for (let x = f.x + 12; x < f.x + f.w; x += step) {
-          const tx = x + rng.between(-10, 10);
-          const ty = y + rng.between(-10, 10);
-          const size = rng.realInRange(1, 1.4);
-          if (Math.abs(ty - this.riverYAt(tx)) < RIVER.ancho / 2 + 10) continue; // no hay árboles en el agua
-          const nearTown =
-            (f.x > 0 && tx - f.x < edge) ||
-            (f.x + f.w < width && f.x + f.w - tx < edge) ||
-            (f.y > 0 && ty - f.y < edge) ||
-            (f.y + f.h < height && f.y + f.h - ty < edge);
-          if (nearTown) this.addTree(tx, ty, size, false);
-          else baked.push(this.make.image({ key: this.treeTexture(), add: false }).setOrigin(0.5, 1).setPosition(tx, ty).setScale(size));
-        }
+    const { width, height } = TOWN_SIZE;
+    const nearRiver = (x, y) => this.riverPoints.some((p) => Math.abs(p.x - x) < 40 && Math.abs(p.y - y) < 40);
+    for (let y = 12; y < height + 20; y += step) {
+      for (let x = 12; x < width; x += step) {
+        const tx = x + rng.between(-10, 10);
+        const ty = y + rng.between(-10, 10);
+        const size = rng.realInRange(1, 1.4);
+        const foot = yAt(this.mountainFoot, tx);
+        const rail = yAt(this.railPoints, tx);
+        const inMountain = ty < foot - 8 && !this.isInClearing(tx, ty, 6);
+        const pastRail = ty > rail + 24;
+        const inForest = FOREST.some((f) => tx > f.x && tx < f.x + f.w && ty > f.y && ty < f.y + f.h);
+        if (!(inMountain || pastRail || inForest) || nearRiver(tx, ty)) continue;
+
+        const edge = (inMountain && (foot - ty < 50 || this.isInClearing(tx, ty, 44))) || pastRail || inForest;
+        if (edge) this.addTree(tx, ty, { size, solid: false });
+        else baked.push(this.make.image({ key: this.treeTexture(), add: false }).setOrigin(0.5, 1).setPosition(tx, ty).setScale(size));
       }
     }
     this.ground.draw(baked.sort((a, b) => a.y - b.y));
     for (const tree of baked) tree.destroy();
   }
 
-  // Niebla: una capa de nubes blancas por cada zona cerrada, que bloquea el paso.
-  // Las nubes se pintan una sola vez en una imagen por zona (que se mece despacio),
-  // y unas pocas nubes sueltas se mueven por encima para darle vida.
+  // Niebla: una capa de nubes blancas por cada zona cerrada, que bloquea el paso
   createFog() {
-    const cloud = this.makeCloudTexture();
-    const inset = 40;
-    const margin = 120;
     for (const zone of this.zones) {
       zone.fogParts = [];
+      zone.fogObstacles = [];
       if (!zone.foggy) continue;
+      this.createZoneFog(zone);
+      zone.fogObstacles = this.blockShape((x, y) => this.zoneAt(x, y) === zone, zone.bounds, FOG_CELL);
+    }
+  }
 
-      const left = zone.x - margin;
-      const top = zone.y - margin;
-      const width = zone.w + margin * 2;
-      const height = zone.h + margin * 2;
-      const local = (p) => ({ x: p.x - left, y: p.y - top });
+  // Las nubes de una zona se pintan una sola vez en una imagen (que se mece despacio),
+  // y unas pocas nubes sueltas se mueven por encima para darle vida.
+  // Junto a una zona abierta, las nubes se quedan algo más adentro para no taparla;
+  // junto a otra zona con niebla, llegan hasta el borde para que no quede una raya sin niebla.
+  createZoneFog(zone) {
+    const cloud = this.makeCloudTexture();
+    const margin = 100;
+    const { x: left0, y: top0, width: w0, height: h0 } = zone.bounds;
+    const left = left0 - margin;
+    const top = top0 - margin;
+    const rng = new Phaser.Math.RandomDataGenerator([String(zone.id)]);
+    const foggyAt = (x, y) => Boolean(this.zoneAt(x, y)?.foggy);
+    const clearAround = (x, y, r) =>
+      [0, 1, 2, 3, 4, 5, 6, 7].every((k) => foggyAt(x + Math.cos((k * Math.PI) / 4) * r, y + Math.sin((k * Math.PI) / 4) * r));
 
-      // Base algo más pequeña que la zona: los bordes los forman las nubes, no una línea recta
-      const base = this.make.graphics({ add: false });
-      base
-        .fillStyle(0xf4f1ec, 0.92)
-        .fillRect(margin + inset, margin + inset, zone.w - inset * 2, zone.h - inset * 2);
-
-      const rng = new Phaser.Math.RandomDataGenerator([String(zone.id)]);
-      const edgePoint = () => {
-        // Un punto del borde, desplazado un poco hacia dentro para tapar el borde de la base
-        const onX = rng.frac() < zone.w / (zone.w + zone.h);
-        const depth = rng.between(0, inset + 30);
-        const x = onX ? zone.x + rng.between(0, zone.w) : rng.frac() < 0.5 ? zone.x + depth : zone.x + zone.w - depth;
-        const y = onX ? (rng.frac() < 0.5 ? zone.y + depth : zone.y + zone.h - depth) : zone.y + rng.between(0, zone.h);
-        return { x, y };
-      };
-      const puff = (p, alpha) =>
-        this.make
-          .image({ key: cloud, add: false })
-          .setPosition(p.x, p.y)
-          .setDisplaySize(rng.between(150, 230), rng.between(120, 170))
-          .setAlpha(alpha);
-
-      const puffs = [];
-      for (let i = 0; i < Math.ceil((zone.w + zone.h) / 10); i++) puffs.push(puff(local(edgePoint()), 0.9));
-      for (let i = 0; i < Math.ceil((zone.w * zone.h) / 9000); i++) {
-        const p = { x: zone.x + rng.between(inset, zone.w - inset), y: zone.y + rng.between(inset, zone.h - inset) };
-        puffs.push(puff(local(p), 0.5));
+    const puffs = [];
+    for (let y = top0; y < top0 + h0; y += 40) {
+      for (let x = left0; x < left0 + w0; x += 40) {
+        const px = x + rng.between(-10, 10);
+        const py = y + rng.between(-10, 10);
+        if (this.zoneAt(px, py) !== zone) continue;
+        // Nube grande lejos de las zonas abiertas, pequeña cerca de ellas
+        const size = clearAround(px, py, 55) ? rng.between(130, 170) : clearAround(px, py, 28) ? rng.between(60, 80) : 0;
+        if (!size) continue;
+        puffs.push(
+          this.make
+            .image({ key: cloud, add: false })
+            .setPosition(px - left, py - top)
+            .setDisplaySize(size, size * 0.85)
+            .setAlpha(0.95),
+        );
       }
-      const layer = this.add
-        .renderTexture(left + width / 2, top + height / 2, width, height)
-        .setDepth(FOG_DEPTH)
-        .setAlpha(0.95);
-      layer.draw([base, ...puffs]);
-      base.destroy();
-      for (const p of puffs) p.destroy();
-      this.tweens.add({ targets: layer, x: layer.x + 10, y: layer.y + 5, duration: 6000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      zone.fogParts.push(layer);
+    }
+    const width = w0 + margin * 2;
+    const height = h0 + margin * 2;
+    const layer = this.add.renderTexture(left + width / 2, top + height / 2, width, height).setDepth(FOG_DEPTH);
+    layer.draw(puffs);
+    for (const p of puffs) p.destroy();
+    this.tweens.add({ targets: layer, x: layer.x + 8, y: layer.y + 4, duration: 6000, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    zone.fogParts.push(layer);
 
-      // Nubes sueltas que se mueven por el borde
-      for (let i = 0; i < 6; i++) {
-        const p = edgePoint();
-        const drifting = puff(p, 0.7).setDepth(FOG_DEPTH);
-        this.add.existing(drifting);
-        this.tweens.add({
-          targets: drifting,
-          x: p.x + rng.between(-30, 30),
-          y: p.y + rng.between(-15, 15),
-          duration: rng.between(4000, 7000),
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.easeInOut',
-        });
-        zone.fogParts.push(drifting);
-      }
-      // Se bloquea un poco antes del borde visible
-      zone.fogObstacle = this.addObstacle(zone.x - 10, zone.y - 10, zone.w + 20, zone.h + 20);
+    // Nubes sueltas que se mueven despacio por dentro de la zona
+    for (let i = 0; i < 20 && zone.fogParts.length < 6; i++) {
+      const x = left0 + rng.between(0, w0);
+      const y = top0 + rng.between(0, h0);
+      if (this.zoneAt(x, y) !== zone || !clearAround(x, y, 70)) continue;
+      const drifting = this.add.image(x, y, cloud).setDisplaySize(rng.between(130, 170), rng.between(100, 130)).setAlpha(0.6).setDepth(FOG_DEPTH);
+      this.tweens.add({
+        targets: drifting,
+        x: x + rng.between(-30, 30),
+        y: y + rng.between(-15, 15),
+        duration: rng.between(4000, 7000),
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.easeInOut',
+      });
+      zone.fogParts.push(drifting);
     }
   }
 
@@ -610,18 +690,17 @@ export default class TownScene extends Phaser.Scene {
     this.clues = [];
     for (const clue of CLUES) {
       if (state.inventory.includes(clue.id)) continue;
-      const p = clue;
       // Farolillo provisional con un brillo que late para llamar la atención
-      const shine = this.add.circle(p.x, p.y - 6, 10, 0xffe9a8, 0.5).setDepth(p.y - 1);
+      const shine = this.add.circle(clue.x, clue.y - 6, 10, 0xffe9a8, 0.5).setDepth(clue.y - 1);
       this.tweens.add({ targets: shine, scale: 1.5, alpha: 0.1, duration: 900, yoyo: true, repeat: -1 });
-      const body = this.add.graphics().setDepth(p.y);
-      body.fillStyle(0xe8dcc0).fillRect(p.x - 4, p.y - 11, 8, 10);
-      body.fillStyle(0x8a5a3b).fillRect(p.x - 5, p.y - 12, 10, 2).fillRect(p.x - 5, p.y - 1, 10, 2);
+      const body = this.add.graphics().setDepth(clue.y);
+      body.fillStyle(0xe8dcc0).fillRect(clue.x - 4, clue.y - 11, 8, 10);
+      body.fillStyle(0x8a5a3b).fillRect(clue.x - 5, clue.y - 12, 10, 2).fillRect(clue.x - 5, clue.y - 1, 10, 2);
       this.clues.push({ ...clue, parts: [shine, body] });
     }
   }
 
-  // Cartel con el nombre de un sitio, sobre el punto (x, y) del plano y "raise" píxeles más arriba.
+  // Cartel con el nombre de un sitio, sobre el punto (x, y) y "raise" píxeles más arriba.
   // Los carteles de las zonas con niebla no se ven hasta que la niebla se retira.
   addLabel(x, y, raise, text) {
     const label = this.add
@@ -636,7 +715,7 @@ export default class TownScene extends Phaser.Scene {
     }
   }
 
-  // Luz de la tarde sobre todo el barrio
+  // Luz de la tarde sobre todo el pueblo
   createLighting() {
     const phase = PHASES[state.phase];
     const color = Phaser.Display.Color.Interpolate.ColorWithColor(
@@ -664,8 +743,7 @@ export default class TownScene extends Phaser.Scene {
     const steps = [];
 
     for (const zone of zones) {
-      const center = { x: zone.x + zone.w / 2, y: zone.y + zone.h / 2 };
-      steps.push((next) => this.moveCamera(center, ZOOM * 0.6, 1800, next));
+      steps.push((next) => this.moveCamera({ x: zone.bounds.centerX, y: zone.bounds.centerY }, ZOOM * 0.6, 1800, next));
       steps.push((next) => {
         this.ui.showTitle('🌫️ La niebla se retira…');
         this.clearFog(zone, next);
@@ -707,7 +785,7 @@ export default class TownScene extends Phaser.Scene {
   }
 
   clearFog(zone, onDone) {
-    const center = { x: zone.x + zone.w / 2, y: zone.y + zone.h / 2 };
+    const center = { x: zone.bounds.centerX, y: zone.bounds.centerY };
     const duration = 2600;
     for (const part of zone.fogParts) {
       this.tweens.killTweensOf(part);
@@ -724,10 +802,12 @@ export default class TownScene extends Phaser.Scene {
     // Jirones de niebla que se separan y se alejan del centro mientras se desvanecen
     const rng = new Phaser.Math.RandomDataGenerator([`jirones-${zone.id}`]);
     for (let i = 0; i < 28; i++) {
-      const p = { x: zone.x + rng.between(0, zone.w), y: zone.y + rng.between(0, zone.h) };
-      const angle = Math.atan2(p.y - center.y, p.x - center.x);
+      const x = zone.bounds.x + rng.between(0, zone.bounds.width);
+      const y = zone.bounds.y + rng.between(0, zone.bounds.height);
+      if (!Phaser.Geom.Polygon.Contains(zone.polygon, x, y)) continue;
+      const angle = Math.atan2(y - center.y, x - center.x);
       const wisp = this.add
-        .image(p.x, p.y, this.makeCloudTexture())
+        .image(x, y, this.makeCloudTexture())
         .setDisplaySize(rng.between(140, 220), rng.between(110, 160))
         .setDepth(FOG_DEPTH + 1)
         .setAlpha(0);
@@ -737,8 +817,8 @@ export default class TownScene extends Phaser.Scene {
           { alpha: 0.85, duration: 500, delay: rng.between(0, 600) },
           {
             alpha: 0,
-            x: p.x + Math.cos(angle) * 140,
-            y: p.y + Math.sin(angle) * 140,
+            x: x + Math.cos(angle) * 140,
+            y: y + Math.sin(angle) * 140,
             duration: rng.between(1800, 2600),
             ease: 'Sine.easeOut',
           },
@@ -750,8 +830,23 @@ export default class TownScene extends Phaser.Scene {
     this.time.delayedCall(duration + 600, () => {
       zone.fogParts = [];
       zone.foggy = false;
-      if (zone.fogObstacle) this.removeObstacle(zone.fogObstacle);
-      zone.fogObstacle = null;
+      for (const rect of zone.fogObstacles) this.removeObstacle(rect);
+      zone.fogObstacles = [];
+      // La niebla de las zonas vecinas se recoge un poco, para no tapar la que se ha abierto
+      for (const other of this.zones.filter((z) => z.foggy)) {
+        const old = other.fogParts;
+        other.fogParts = [];
+        this.createZoneFog(other);
+        for (const part of other.fogParts) {
+          const alpha = part.alpha;
+          part.setAlpha(0);
+          this.tweens.add({ targets: part, alpha, duration: 800 });
+        }
+        for (const part of old) {
+          this.tweens.killTweensOf(part);
+          this.tweens.add({ targets: part, alpha: 0, duration: 800, onComplete: () => part.destroy() });
+        }
+      }
       this.buildPathfinder();
       if (!state.revealedZones.includes(zone.id)) state.revealedZones.push(zone.id);
       onDone();
@@ -896,7 +991,7 @@ export default class TownScene extends Phaser.Scene {
       return 'El espíritu buscaba algo pequeño de papel que daba luz… ¿junto a la niebla?';
     }
     if (CLUES.some((c) => !state.inventory.includes(c.id))) return 'Explora el pueblo… quizá haya algo junto a la niebla';
-    if (state.spirits.okiku === 'resuelto') return 'La niebla se ha retirado del río. Cruza el puente y explora la orilla.';
+    if (state.spirits.okiku === 'resuelto') return 'La niebla se ha retirado del río. Pasea por la orilla y cruza el puente rojo.';
     return 'Vuelve a la puerta de la librería cuando quieras';
   }
 

@@ -12,20 +12,17 @@ export default class Pathfinder {
     this.cellSize = cellSize;
     this.cols = Math.ceil(width / cellSize);
     this.rows = Math.ceil(height / cellSize);
-    this.walkable = [];
+    this.walkable = Array.from({ length: this.rows }, () => new Array(this.cols).fill(true));
 
-    for (let row = 0; row < this.rows; row++) {
-      this.walkable[row] = [];
-      for (let col = 0; col < this.cols; col++) {
-        const cx = col * cellSize + cellSize / 2;
-        const cy = row * cellSize + cellSize / 2;
-        this.walkable[row][col] = !obstacles.some(
-          (o) =>
-            cx > o.x - margin.x &&
-            cx < o.x + o.w + margin.x &&
-            cy > o.y - margin.top &&
-            cy < o.y + o.h + margin.bottom,
-        );
+    // Cada obstáculo marca las casillas cuyo centro queda dentro de él (más el margen)
+    const half = cellSize / 2;
+    for (const o of obstacles) {
+      const fromCol = Math.max(0, Math.floor((o.x - margin.x - half) / cellSize) + 1);
+      const toCol = Math.min(this.cols - 1, Math.ceil((o.x + o.w + margin.x - half) / cellSize) - 1);
+      const fromRow = Math.max(0, Math.floor((o.y - margin.top - half) / cellSize) + 1);
+      const toRow = Math.min(this.rows - 1, Math.ceil((o.y + o.h + margin.bottom - half) / cellSize) - 1);
+      for (let row = fromRow; row <= toRow; row++) {
+        for (let col = fromCol; col <= toCol; col++) this.walkable[row][col] = false;
       }
     }
   }

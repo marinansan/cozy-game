@@ -33,7 +33,7 @@ Juego *cozy* de gestión, exploración y construcción. Heredas la librería-caf
 ## 4. Perspectiva y arte
 
 - **Exteriores (el pueblo) e interiores: vista cenital en 3/4**, como Stardew Valley: el suelo se ve desde arriba, con calles rectas, y los edificios muestran su fachada y el tejado. (Antes el pueblo era isométrico; se cambió para que todo el juego tenga la misma vista.)
-- **De lejos:** botón de mapa que muestra el pueblo entero: estación en el centro, vía del tren, río con puentes, santuario con escaleras al norte, bosque alrededor y niebla sobre las zonas que aún no se recuerdan. Distribución en `src/data/townLayout.js` (boceto en `gat/overview/mapa-boceto.png`).
+- **De lejos:** botón de mapa que muestra el pueblo entero. El pueblo crece alrededor del río (con un paseo en cada orilla y varios puentes) y de la calle antigua, que sube del puente rojo al santuario de la montaña. Al sur, la estación frente a la vía y el bosque. Distribución en `src/data/townLayout.js` (boceto en `gat/overview/mapa-boceto-v6.png`).
 - **Pixel art "suave":** contornos suaves, paletas armónicas poco saturadas, luz ambiental. Ver `gat/narrative/world.md` §7.
 - **Arte inicial:** imágenes generadas con ChatGPT y limpiadas con `tools/clean_art.py` (cuadrícula real de píxeles y colores limitados). Personaje provisional con formas.
 - **Arte definitivo:** se rediseñará la librería y todo lo demás más adelante.
